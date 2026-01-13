@@ -1109,10 +1109,9 @@ function drawDenseTiling() {
     const quad = currentTile.quad;
     
     // Compute two translation vectors from the quad points
-    // For proper tiling, both vectors must originate from the same point
-    // Try using quad[2] as reference instead of quad[0]
-    const vec1 = subtractPoints(quad[0], quad[2]);
-    const vec2 = subtractPoints(quad[1], quad[2]);
+    // These vectors define the periodic structure of the supertile arrangement
+    const vec1 = subtractPoints(quad[1], quad[0]);
+    const vec2 = subtractPoints(quad[3], quad[0]);
     
     // Calculate how many copies we need to cover the viewport
     const inverseTransform = invertMatrix(toScreenTransform);
