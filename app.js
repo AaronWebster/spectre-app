@@ -161,7 +161,7 @@ function matchTwo( p1, q1, p2, q2 )
 	return mul( matchSeg( p2, q2 ), inv( matchSeg( p1, q1 ) ) );
 };
 
-function drawPolygon( shape, T, f, s, w )
+function drawPolygon( shape, f, s, w )
 {
 	if( f != null ) {
 		fill( ...f );
@@ -176,8 +176,7 @@ function drawPolygon( shape, T, f, s, w )
 	}
 	beginShape();
 	for( let p of shape ) {
-		const tp = transPt( T, p );
-		vertex( tp.x, tp.y );
+		vertex( p.x, p.y );
 	}
 	endShape( CLOSE );
 }
@@ -196,9 +195,9 @@ class Shape
 		this.label = label;
 	}
 
-	draw( S )
+	draw()
 	{
-		drawPolygon( this.pts, S, colmap[this.label], [0,0,0], 0.1 );
+		drawPolygon( this.pts, colmap[this.label], [0,0,0], 0.1 );
 	}
 
 	streamSVG( S, stream )
@@ -247,20 +246,19 @@ class CurvyShape
 		}
 	}
 
-	draw( S )
+	draw()
 	{
 		fill( ...colmap[this.label] );
 		strokeWeight( 0.1 );
 		stroke( 0 );
 
 		beginShape();
-		const tp = transPt( S, this.pts[0] );
-		vertex( tp.x, tp.y );
+		vertex( this.pts[0].x, this.pts[0].y );
 
 		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
-			const a = transPt( S, this.pts[idx] );
-			const b = transPt( S, this.pts[idx+1] );
-			const c = transPt( S, this.pts[idx+2] );
+			const a = this.pts[idx];
+			const b = this.pts[idx+1];
+			const c = this.pts[idx+2];
 
 			bezierVertex( a.x, a.y, b.x, b.y, c.x, c.y );
 		}
@@ -301,10 +299,14 @@ class Meta
 		this.geoms.push( { geom : g, xform: T } );
 	}
 
-	draw( S ) 
+	draw() 
 	{
 		for( let g of this.geoms ) {
-			g.geom.draw( mul( S, g.xform ) );
+			push();
+			const M = g.xform;
+			applyMatrix( M[0], M[3], M[1], M[4], M[2], M[5] );
+			g.geom.draw();
+			pop();
 		}
 	}
 
@@ -689,7 +691,7 @@ function draw()
 		colmap = colmap_mystics;
 	}
 
-	sys[tile_sel.value()].draw( ident );
+	sys[tile_sel.value()].draw();
 
 	pop();
 
