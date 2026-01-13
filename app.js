@@ -15,10 +15,15 @@
 const IDENTITY_MATRIX = [1, 0, 0, 0, 1, 0];
 const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
 const DENSE_TILING_BUFFER = 1.5; // Multiplier for viewport coverage buffer
+
+// UI layout constants
+const UI_BOX_X = 5;
+const UI_BOX_Y = 5;
 const UI_BOX_WIDTH = 135;
 const UI_BOX_HEIGHT = 255;
-const UI_INTERACTION_WIDTH = 150;
-const UI_INTERACTION_HEIGHT = 270;
+const UI_PADDING = 15; // Extra padding for interaction area beyond visible box
+const UI_INTERACTION_WIDTH = UI_BOX_WIDTH + UI_PADDING;
+const UI_INTERACTION_HEIGHT = UI_BOX_HEIGHT + UI_PADDING;
 
 const TILE_NAMES = [
     'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
@@ -1029,7 +1034,7 @@ function draw() {
         stroke(0);
         strokeWeight(0.5);
         fill(255, 220);
-        rect(5, 5, UI_BOX_WIDTH, UI_BOX_HEIGHT);
+        rect(UI_BOX_X, UI_BOX_Y, UI_BOX_WIDTH, UI_BOX_HEIGHT);
     }
     
     noLoop();
