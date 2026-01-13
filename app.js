@@ -15,8 +15,9 @@
 const IDENTITY_MATRIX = [1, 0, 0, 0, 1, 0];
 const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
 
-// Dense tiling buffer: ensures complete tile coverage during zoom/pan/resize while
-// minimizing performance impact by limiting excessive generation to 50% beyond viewport
+// Dense tiling buffer: ensures complete tile coverage during zoom/pan/resize.
+// With the grid-based dense tiling approach, a smaller buffer is sufficient
+// since multiple tile copies are placed to cover the viewport.
 const DENSE_TILING_BUFFER = 1.5;
 
 // UI layout constants
@@ -991,12 +992,67 @@ function handleSaveSVG() {
     stream.push(`<g transform="translate(${width / 2},${height / 2})">`);
 
     drawCounter = 1;
-    tileSystem[tileSelector.value()].streamSVG(toScreenTransform, stream);
+    streamDenseTilingSVG(stream);
 
     stream.push('</g>');
     stream.push('</svg>');
 
     saveStrings(stream, 'output', 'svg');
+}
+
+/**
+ * Streams dense tiling to SVG format
+ * @param {Array<string>} stream - Output stream for SVG strings
+ */
+function streamDenseTilingSVG(stream) {
+    const currentTile = tileSystem[tileSelector.value()];
+    const quad = currentTile.quad;
+    
+    // Compute two translation vectors from the quad points
+    const vec1 = subtractPoints(quad[1], quad[0]);
+    const vec2 = subtractPoints(quad[3], quad[0]);
+    
+    // Calculate how many copies we need to cover the viewport
+    const inverseTransform = invertMatrix(toScreenTransform);
+    const corners = [
+        transformPoint(inverseTransform, createPoint(-width / 2, -height / 2)),
+        transformPoint(inverseTransform, createPoint(width / 2, -height / 2)),
+        transformPoint(inverseTransform, createPoint(width / 2, height / 2)),
+        transformPoint(inverseTransform, createPoint(-width / 2, height / 2))
+    ];
+    
+    // Find the bounds in world space
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let corner of corners) {
+        minX = Math.min(minX, corner.x);
+        maxX = Math.max(maxX, corner.x);
+        minY = Math.min(minY, corner.y);
+        maxY = Math.max(maxY, corner.y);
+    }
+    
+    // Calculate grid range needed
+    const vecLength = Math.max(
+        Math.hypot(vec1.x, vec1.y),
+        Math.hypot(vec2.x, vec2.y)
+    );
+    
+    if (vecLength < 0.001) {
+        // Fallback for base tiles
+        currentTile.streamSVG(toScreenTransform, stream);
+        return;
+    }
+    
+    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 2;
+    
+    // Stream grid of tile copies
+    for (let i = -range; i <= range; i++) {
+        for (let j = -range; j <= range; j++) {
+            const offsetX = i * vec1.x + j * vec2.x;
+            const offsetY = i * vec1.y + j * vec2.y;
+            const transform = multiplyMatrices(toScreenTransform, translationMatrix(offsetX, offsetY));
+            currentTile.streamSVG(transform, stream);
+        }
+    }
 }
 
 /**
@@ -1020,10 +1076,10 @@ function draw() {
     // Use white color scheme for all tiles
     currentColorMap = COLOR_SCHEMES.white;
 
-    // Draw tiles
+    // Draw tiles with dense tiling - use grid of copies to ensure full coverage
     drawCounter = 1;
     tilesDrawnCount = 0;
-    tileSystem[tileSelector.value()].draw(IDENTITY_MATRIX);
+    drawDenseTiling();
 
     pop();
 
@@ -1041,6 +1097,62 @@ function draw() {
     }
     
     noLoop();
+}
+
+/**
+ * Draws tiles in a dense pattern to ensure full viewport coverage.
+ * Uses the supertile's quad points to compute translation vectors for tiling.
+ */
+function drawDenseTiling() {
+    const currentTile = tileSystem[tileSelector.value()];
+    const quad = currentTile.quad;
+    
+    // Compute two translation vectors from the quad points
+    // These vectors define the periodic structure of the supertile arrangement
+    const vec1 = subtractPoints(quad[1], quad[0]);
+    const vec2 = subtractPoints(quad[3], quad[0]);
+    
+    // Calculate how many copies we need to cover the viewport
+    const inverseTransform = invertMatrix(toScreenTransform);
+    const corners = [
+        transformPoint(inverseTransform, createPoint(-width / 2, -height / 2)),
+        transformPoint(inverseTransform, createPoint(width / 2, -height / 2)),
+        transformPoint(inverseTransform, createPoint(width / 2, height / 2)),
+        transformPoint(inverseTransform, createPoint(-width / 2, height / 2))
+    ];
+    
+    // Find the bounds in world space
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let corner of corners) {
+        minX = Math.min(minX, corner.x);
+        maxX = Math.max(maxX, corner.x);
+        minY = Math.min(minY, corner.y);
+        maxY = Math.max(maxY, corner.y);
+    }
+    
+    // Calculate grid range needed (with some buffer)
+    const vecLength = Math.max(
+        Math.hypot(vec1.x, vec1.y),
+        Math.hypot(vec2.x, vec2.y)
+    );
+    
+    if (vecLength < 0.001) {
+        // Fallback for base tiles without meaningful quad vectors
+        currentTile.draw(IDENTITY_MATRIX);
+        return;
+    }
+    
+    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 2;
+    
+    // Draw grid of tile copies
+    for (let i = -range; i <= range; i++) {
+        for (let j = -range; j <= range; j++) {
+            const offsetX = i * vec1.x + j * vec2.x;
+            const offsetY = i * vec1.y + j * vec2.y;
+            const transform = translationMatrix(offsetX, offsetY);
+            currentTile.draw(transform);
+        }
+    }
 }
 
 /**
