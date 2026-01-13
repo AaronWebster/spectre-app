@@ -1009,9 +1009,9 @@ function streamDenseTilingSVG(stream) {
     const quad = currentTile.quad;
     
     // Compute two translation vectors from the quad points
-    // For proper tiling, both vectors must originate from the same point
-    const vec1 = subtractPoints(quad[0], quad[2]);
-    const vec2 = subtractPoints(quad[1], quad[2]);
+    // These vectors define the periodic structure of the supertile arrangement
+    const vec1 = subtractPoints(quad[1], quad[0]);
+    const vec2 = subtractPoints(quad[3], quad[0]);
     
     // Calculate how many copies we need to cover the viewport
     const inverseTransform = invertMatrix(toScreenTransform);
@@ -1031,7 +1031,7 @@ function streamDenseTilingSVG(stream) {
         maxY = Math.max(maxY, corner.y);
     }
     
-    // Calculate grid range needed
+    // Calculate grid range needed (with extra buffer to ensure complete coverage)
     const vecLength = Math.max(
         Math.hypot(vec1.x, vec1.y),
         Math.hypot(vec2.x, vec2.y)
@@ -1043,13 +1043,13 @@ function streamDenseTilingSVG(stream) {
         return;
     }
     
-    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 2;
+    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 4;
     
-    // Stream grid of tile copies
-    for (let i = -range; i <= range; i++) {
-        for (let j = -range; j <= range; j++) {
-            const offsetX = i * vec1.x + j * vec2.x;
-            const offsetY = i * vec1.y + j * vec2.y;
+    // Stream grid of tile copies with double density for better coverage
+    for (let i = -range * 2; i <= range * 2; i++) {
+        for (let j = -range * 2; j <= range * 2; j++) {
+            const offsetX = (i * 0.5) * vec1.x + (j * 0.5) * vec2.x;
+            const offsetY = (i * 0.5) * vec1.y + (j * 0.5) * vec2.y;
             const transform = multiplyMatrices(toScreenTransform, translationMatrix(offsetX, offsetY));
             currentTile.streamSVG(transform, stream);
         }
@@ -1132,7 +1132,7 @@ function drawDenseTiling() {
         maxY = Math.max(maxY, corner.y);
     }
     
-    // Calculate grid range needed (with some buffer)
+    // Calculate grid range needed (with extra buffer to ensure complete coverage)
     const vecLength = Math.max(
         Math.hypot(vec1.x, vec1.y),
         Math.hypot(vec2.x, vec2.y)
@@ -1144,13 +1144,13 @@ function drawDenseTiling() {
         return;
     }
     
-    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 2;
+    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 4;
     
-    // Draw grid of tile copies
-    for (let i = -range; i <= range; i++) {
-        for (let j = -range; j <= range; j++) {
-            const offsetX = i * vec1.x + j * vec2.x;
-            const offsetY = i * vec1.y + j * vec2.y;
+    // Draw grid of tile copies with double density for better coverage
+    for (let i = -range * 2; i <= range * 2; i++) {
+        for (let j = -range * 2; j <= range * 2; j++) {
+            const offsetX = (i * 0.5) * vec1.x + (j * 0.5) * vec2.x;
+            const offsetY = (i * 0.5) * vec1.y + (j * 0.5) * vec2.y;
             const transform = translationMatrix(offsetX, offsetY);
             currentTile.draw(transform);
         }
