@@ -1,0 +1,967 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+<script>
+const ident = [1,0,0,0,1,0];
+
+let to_screen = [20, 0, 0, 0, -20, 0];
+let lw_scale = 1;
+
+let sys;
+let gen_level = 0;
+const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
+
+let tile_sel;
+let shape_sel;
+let colscheme_sel;
+let number_checkbox;
+let tile_count_span;
+
+let dragging = false;
+let uibox = true;
+let draw_counter = 1;
+let tiles_drawn_count = 0;
+
+// Touch handling variables
+let prev_touch_dist = -1;
+let prev_touch_center = null;
+
+const tile_names = [
+	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
+	'Pi', 'Sigma', 'Phi', 'Psi' ];
+
+// Color map from Figure 5.3
+const colmap53 = {
+	'Gamma' : [203, 157, 126],
+	'Gamma1' : [203, 157, 126],
+	'Gamma2' : [203, 157, 126],
+	'Delta' : [163, 150, 133],
+	'Theta' : [208, 215, 150],
+	'Lambda' : [184, 205, 178],
+	'Xi' : [211, 177, 144],
+	'Pi' : [218, 197, 161],
+	'Sigma' : [191, 146, 126],
+	'Phi' : [228, 213, 167],
+	'Psi' : [224, 223, 156] };
+
+const colmap_orig = {
+	'Gamma' : [255, 255, 255],
+	'Gamma1' : [255, 255, 255],
+	'Gamma2' : [255, 255, 255],
+	'Delta' : [220, 220, 220],
+	'Theta' : [255, 191, 191],
+	'Lambda' : [255, 160, 122],
+	'Xi' : [255, 242, 0],
+	'Pi' : [135, 206, 250],
+	'Sigma' : [245, 245, 220],
+	'Phi' : [0, 255, 0],
+	'Psi' : [0, 255, 255] };
+
+const colmap_mystics = {
+	'Gamma' : [196, 201, 169],
+	'Gamma1' : [196, 201, 169],
+	'Gamma2' : [156, 160, 116],
+	'Delta' : [247, 252, 248],
+	'Theta' : [247, 252, 248],
+	'Lambda' : [247, 252, 248],
+	'Xi' : [247, 252, 248],
+	'Pi' : [247, 252, 248],
+	'Sigma' : [247, 252, 248],
+	'Phi' : [247, 252, 248],
+	'Psi' : [247, 252, 248] };
+
+const colmap_pride = {
+	'Gamma' : [255, 255, 255],
+	'Gamma1' : [97, 57, 21],
+	'Gamma2' : [0, 0, 0],
+	'Delta' : [2, 129, 33],
+	'Theta' : [0, 76, 255],
+	'Lambda' : [118, 0, 136],
+	'Xi' : [229, 0, 0],
+	'Pi' : [255, 175, 199],
+	'Sigma' : [115, 215, 238],
+	'Phi' : [255, 141, 0],
+	'Psi' : [255, 238, 0] };
+
+const colmap_white = {
+	'Gamma' : [255, 255, 255],
+	'Gamma1' : [255, 255, 255],
+	'Gamma2' : [255, 255, 255],
+	'Delta' : [255, 255, 255],
+	'Theta' : [255, 255, 255],
+	'Lambda' : [255, 255, 255],
+	'Xi' : [255, 255, 255],
+	'Pi' : [255, 255, 255],
+	'Sigma' : [255, 255, 255],
+	'Phi' : [255, 255, 255],
+	'Psi' : [255, 255, 255] };
+
+let colmap = colmap_pride;
+
+function pt( x, y )
+{
+	return { x : x, y : y };
+}
+
+// Affine matrix inverse
+function inv( T ) {
+	const det = T[0]*T[4] - T[1]*T[3];
+	return [T[4]/det, -T[1]/det, (T[1]*T[5]-T[2]*T[4])/det,
+		-T[3]/det, T[0]/det, (T[2]*T[3]-T[0]*T[5])/det];
+};
+
+// Affine matrix multiply
+function mul( A, B )
+{
+	return [A[0]*B[0] + A[1]*B[3],
+		A[0]*B[1] + A[1]*B[4],
+		A[0]*B[2] + A[1]*B[5] + A[2],
+
+		A[3]*B[0] + A[4]*B[3],
+		A[3]*B[1] + A[4]*B[4],
+		A[3]*B[2] + A[4]*B[5] + A[5]];
+}
+
+function padd( p, q )
+{
+	return { x : p.x + q.x, y : p.y + q.y };
+}
+
+function psub( p, q )
+{
+	return { x : p.x - q.x, y : p.y - q.y };
+}
+
+function pframe( o, p, q, a, b )
+{
+	return { x : o.x + a*p.x + b*q.x, y : o.y + a*p.y + b*q.y };
+}
+
+// Rotation matrix
+function trot( ang )
+{
+	const c = cos( ang );
+	const s = sin( ang );
+	return [c, -s, 0, s, c, 0];
+}
+
+// Translation matrix
+function ttrans( tx, ty )
+{
+	return [1, 0, tx, 0, 1, ty];
+}
+
+function transTo( p, q )
+{
+	return ttrans( q.x - p.x, q.y - p.y );
+}
+
+function rotAbout( p, ang )
+{
+	return mul( ttrans( p.x, p.y ),
+		mul( trot( ang ), ttrans( -p.x, -p.y ) ) );
+}
+
+// Matrix * point
+function transPt( M, P )
+{
+	return pt(M[0]*P.x + M[1]*P.y + M[2], M[3]*P.x + M[4]*P.y + M[5]);
+}
+
+// Check if a bounding circle (center 'c', radius 'r') in local space 'S' is on screen
+function isOnScreen(S, radius) {
+    // Combine view transform (to_screen) and object transform (S)
+    const M = mul(to_screen, S);
+    
+    // Transform center to screen space (relative to center of canvas)
+    const c_rel = transPt(M, {x:0, y:0});
+    
+    // Actual screen coordinates (0,0 is top-left)
+    const c_x = c_rel.x + width/2;
+    const c_y = c_rel.y + height/2;
+    
+    // Scale the radius
+    // Determine scale from matrix M (hypotenuse of basis vector)
+    const sc = Math.hypot(M[0], M[1]);
+    const r_screen = radius * sc;
+    
+    // Check intersection with screen rect [0, 0, width, height]
+    const closestX = Math.max(0, Math.min(width, c_x));
+    const closestY = Math.max(0, Math.min(height, c_y));
+    
+    const dx = c_x - closestX;
+    const dy = c_y - closestY;
+    
+    return (dx*dx + dy*dy) < (r_screen*r_screen);
+}
+
+function drawPolygon( shape, T, f, s, w )
+{
+	if( f != null ) {
+		fill( ...f );
+	} else {
+		noFill();
+	}
+	if( s != null ) {
+		stroke( 0 );
+		strokeWeight( w ) ; // / lw_scale );
+	} else {
+		noStroke();
+	}
+	beginShape();
+	for( let p of shape ) {
+		const tp = transPt( T, p );
+		vertex( tp.x, tp.y );
+	}
+	endShape( CLOSE );
+}
+
+class Shape
+{
+	constructor( pts, quad, label )
+	{
+		this.pts = pts;
+		this.quad = quad;
+		this.label = label;
+        this.calcRadius();
+	}
+
+    calcRadius() {
+        this.radius = 0;
+        for(let p of this.pts) {
+            let d = Math.hypot(p.x, p.y);
+            if(d > this.radius) this.radius = d;
+        }
+    }
+
+	draw( S )
+	{
+        // Cull check
+        if (!isOnScreen(S, this.radius)) return;
+
+		drawPolygon( this.pts, S, colmap[this.label], [0,0,0], 0.1 );
+        tiles_drawn_count++;
+
+		if( number_checkbox && number_checkbox.checked() ) {
+			let cx = 0, cy = 0;
+			let count = 0;
+			for( let p of this.pts ) {
+				const tp = transPt( S, p );
+				cx += tp.x;
+				cy += tp.y;
+				count++;
+			}
+			cx /= count;
+			cy /= count;
+
+			fill(0);
+			noStroke();
+			textAlign(CENTER, CENTER);
+			textSize(0.5); 
+			push();
+			translate(cx, cy);
+			scale(1, -1);
+			text(draw_counter, 0, 0);
+			pop();
+			draw_counter++;
+		}
+	}
+
+	streamSVG( S, stream )
+	{
+		var s = '<polygon points="';
+		var at_start = true;
+		
+		let cx = 0, cy = 0;
+		let count = 0;
+
+		for( let p of this.pts ) {
+			const sp = transPt( S, p );
+			cx += sp.x;
+			cy += sp.y;
+			count++;
+
+			if( at_start ) {
+				at_start = false;
+			} else {
+				s = s + ' ';
+			}
+			s = s + `${sp.x},${sp.y}`;
+		}
+		const col = colmap[this.label];
+
+		s = s + `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
+		stream.push( s );
+
+		if( number_checkbox && number_checkbox.checked() ) {
+			cx /= count;
+			cy /= count;
+			stream.push( `<text x="${cx}" y="${cy}" font-family="Arial" font-size="12" text-anchor="middle" fill="black">${draw_counter}</text>` );
+			draw_counter++;
+		}
+	}
+}
+
+class CurvyShape
+{
+	constructor( pts, quad, label )
+	{
+		this.quad = quad;
+		this.label = label;
+
+		let blah = true;
+
+		this.pts = [pts[pts.length-1]];
+		for( const p of pts ) {
+			const prev = this.pts[this.pts.length-1];
+			const v = psub( p, prev );
+			const w = pt( -v.y, v.x );
+			if( blah ) {
+				this.pts.push( pframe( prev, v, w, 0.33, 0.6 ) );
+				this.pts.push( pframe( prev, v, w, 0.67, 0.6 ) );
+			} else {
+				this.pts.push( pframe( prev, v, w, 0.33, -0.6 ) );
+				this.pts.push( pframe( prev, v, w, 0.67, -0.6 ) );
+			}
+			blah = !blah;
+			this.pts.push( p );
+		}
+        this.calcRadius();
+	}
+
+    calcRadius() {
+        this.radius = 0;
+        for(let p of this.pts) {
+            let d = Math.hypot(p.x, p.y);
+            if(d > this.radius) this.radius = d;
+        }
+    }
+
+	draw( S )
+	{
+        // Cull check
+        if (!isOnScreen(S, this.radius)) return;
+
+		fill( ...colmap[this.label] );
+		strokeWeight( 0.1 );
+		stroke( 0 );
+
+		beginShape();
+		const tp = transPt( S, this.pts[0] );
+		vertex( tp.x, tp.y );
+
+		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
+			const a = transPt( S, this.pts[idx] );
+			const b = transPt( S, this.pts[idx+1] );
+			const c = transPt( S, this.pts[idx+2] );
+
+			bezierVertex( a.x, a.y, b.x, b.y, c.x, c.y );
+		}
+		endShape( CLOSE );
+        tiles_drawn_count++;
+
+		if( number_checkbox && number_checkbox.checked() ) {
+			let cx = 0, cy = 0;
+			let count = 0;
+			for( let p of this.pts ) {
+				const tp = transPt( S, p );
+				cx += tp.x;
+				cy += tp.y;
+				count++;
+			}
+			cx /= count;
+			cy /= count;
+
+			fill(0);
+			noStroke();
+			textAlign(CENTER, CENTER);
+			textSize(0.5); 
+			push();
+			translate(cx, cy);
+			scale(1, -1);
+			text(draw_counter, 0, 0);
+			pop();
+			draw_counter++;
+		}
+	}
+
+	streamSVG( S, stream )
+	{
+		const tp = transPt( S, this.pts[0] );
+		vertex( tp.x, tp.y );
+
+		let cx = 0, cy = 0;
+		let count = 0;
+		cx += tp.x;
+		cy += tp.y;
+		count++;
+
+		var s = `<path d="M ${tp.x} ${tp.y}`;
+
+		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
+			const a = transPt( S, this.pts[idx] );
+			const b = transPt( S, this.pts[idx+1] );
+			const c = transPt( S, this.pts[idx+2] );
+
+			cx += a.x + b.x + c.x;
+			cy += a.y + b.y + c.y;
+			count += 3;
+
+			s = s + ` C ${a.x} ${a.y} ${b.x} ${b.y} ${c.x} ${c.y}`;
+		}
+		const col = colmap[this.label];
+
+		s = s + `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
+		stream.push( s );
+
+		if( number_checkbox && number_checkbox.checked() ) {
+			cx /= count;
+			cy /= count;
+			stream.push( `<text x="${cx}" y="${cy}" font-family="Arial" font-size="12" text-anchor="middle" fill="black">${draw_counter}</text>` );
+			draw_counter++;
+		}
+	}
+}
+
+class Meta
+{
+	constructor()
+	{
+		this.geoms = [];
+		this.quad = [];
+        this.radius = 0;
+	}
+
+	addChild( g, T )
+	{
+		this.geoms.push( { geom : g, xform: T } );
+	}
+    
+    calcRadius() {
+        this.radius = 0;
+        for( let g of this.geoms ) {
+             const p = transPt(g.xform, {x:0, y:0});
+             const d = Math.hypot(p.x, p.y);
+             // Assume uniform scale of 1 for internal substitutions
+             const r = d + g.geom.radius;
+             if(r > this.radius) this.radius = r;
+        }
+    }
+
+	draw( S )
+	{
+        // Cull check
+        if (!isOnScreen(S, this.radius)) return;
+
+		for( let g of this.geoms ) {
+			g.geom.draw( mul( S, g.xform ) );
+		}
+	}
+
+	streamSVG( S, stream )
+	{
+		for( let g of this.geoms ) {
+			g.geom.streamSVG( mul( S, g.xform ), stream );
+		}
+	}
+}
+
+function buildSpectreBase( curved )
+{
+	const spectre = [
+		pt(0, 0),
+		pt(1.0, 0.0),
+		pt(1.5, -0.8660254037844386),
+		pt(2.366025403784439, -0.36602540378443865),
+		pt(2.366025403784439, 0.6339745962155614),
+		pt(3.366025403784439, 0.6339745962155614),
+		pt(3.866025403784439, 1.5),
+		pt(3.0, 2.0),
+		pt(2.133974596215561, 1.5),
+		pt(1.6339745962155614, 2.3660254037844393),
+		pt(0.6339745962155614, 2.3660254037844393),
+		pt(-0.3660254037844386, 2.3660254037844393),
+		pt(-0.866025403784439, 1.5),
+		pt(0.0, 1.0)
+	];
+
+	const spectre_keys = [
+		spectre[3], spectre[5], spectre[7], spectre[11]
+	];
+
+	const ret = {};
+
+	for( lab of ['Delta', 'Theta', 'Lambda', 'Xi',
+				 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+		if( curved ) {
+			ret[lab] = new CurvyShape( spectre, spectre_keys, lab );
+		} else {
+			ret[lab] = new Shape( spectre, spectre_keys, lab );
+		}
+	}
+
+	const mystic = new Meta();
+	if( curved ) {
+		mystic.addChild(
+			new CurvyShape( spectre, spectre_keys, 'Gamma1' ), ident );
+		mystic.addChild(
+			new CurvyShape( spectre, spectre_keys, 'Gamma2' ),
+				mul( ttrans( spectre[8].x, spectre[8].y ), trot( PI / 6 ) ) );
+	} else {
+		mystic.addChild( new Shape( spectre, spectre_keys, 'Gamma1' ), ident );
+		mystic.addChild( new Shape( spectre, spectre_keys, 'Gamma2' ),
+			mul( ttrans( spectre[8].x, spectre[8].y ), trot( PI / 6 ) ) );
+	}
+	mystic.quad = spectre_keys;
+    mystic.calcRadius();
+	ret['Gamma'] = mystic;
+
+	return ret;
+}
+
+function buildHatTurtleBase( hat_dominant )
+{
+	const r3 = 1.7320508075688772;
+	const hr3 = 0.8660254037844386;
+
+	function hexPt( x, y )
+	{
+		return pt( x + 0.5*y, -hr3*y );
+	}
+
+	function hexPt2( x, y )
+	{
+		return pt( x + hr3*y, -0.5*y );
+	}
+
+	const hat = [
+		hexPt(-1, 2), hexPt(0, 2), hexPt(0, 3), hexPt(2, 2), hexPt(3, 0),
+		hexPt(4, 0), hexPt(5,-1), hexPt(4,-2), hexPt(2,-1), hexPt(2,-2),
+		hexPt( 1, -2), hexPt(0,-2), hexPt(-1,-1), hexPt(0, 0) ];
+
+	const turtle = [
+		hexPt(0,0), hexPt(2,-1), hexPt(3,0), hexPt(4,-1), hexPt(4,-2),
+		hexPt(6,-3), hexPt(7,-5), hexPt(6,-5), hexPt(5,-4), hexPt(4,-5),
+		hexPt(2,-4), hexPt(0,-3), hexPt(-1,-1), hexPt(0,-1)
+		];
+
+	const hat_keys = [
+		hat[3], hat[5], hat[7], hat[11]
+	];
+	const turtle_keys = [
+		turtle[3], turtle[5], turtle[7], turtle[11]
+	];
+
+	const ret = {};
+
+	if( hat_dominant ) {
+		for( lab of ['Delta', 'Theta', 'Lambda', 'Xi',
+					 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+			ret[lab] = new Shape( hat, hat_keys, lab );
+		}
+
+		const mystic = new Meta();
+		mystic.addChild( new Shape( hat, hat_keys, 'Gamma1' ), ident );
+		mystic.addChild( new Shape( turtle, turtle_keys, 'Gamma2' ),
+			ttrans( hat[8].x, hat[8].y ) );
+		mystic.quad = hat_keys;
+        mystic.calcRadius();
+		ret['Gamma'] = mystic;
+	} else {
+		for( lab of ['Delta', 'Theta', 'Lambda', 'Xi',
+					 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+			ret[lab] = new Shape( turtle, turtle_keys, lab );
+		}
+
+		const mystic = new Meta();
+		mystic.addChild( new Shape( turtle, turtle_keys, 'Gamma1' ), ident );
+		mystic.addChild( new Shape( hat, hat_keys, 'Gamma2' ),
+			mul( ttrans( turtle[9].x, turtle[9].y ), trot( PI/3 ) ) );
+		mystic.quad = turtle_keys;
+        mystic.calcRadius();
+		ret['Gamma'] = mystic;
+	}
+
+	return ret;
+}
+
+function buildHexBase()
+{
+	const hr3 = 0.8660254037844386;
+
+	const hex = [
+		pt(0, 0),
+		pt(1.0, 0.0),
+		pt(1.5, hr3),
+		pt(1, 2*hr3),
+		pt(0, 2*hr3),
+		pt(-0.5, hr3)
+	];
+
+	const hex_keys = [ hex[1], hex[2], hex[3], hex[5] ];
+
+	const ret = {};
+
+	for( lab of ['Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
+				 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+		ret[lab] = new Shape( hex, hex_keys, lab );
+	}
+
+	return ret;
+}
+
+function buildSupertiles( sys )
+{
+	// First, use any of the nine-unit tiles in sys to obtain
+	// a list of transformation matrices for placing tiles within
+	// supertiles.
+
+	const quad = sys['Delta'].quad;
+	const R = [-1,0,0,0,1,0];
+
+	const t_rules = [
+		[60, 3, 1], [0, 2, 0], [60, 3, 1], [60, 3, 1],
+		[0, 2, 0], [60, 3, 1], [-120, 3, 3] ];
+
+	const Ts = [ident];
+	let total_ang = 0;
+	let rot = ident;
+	const tquad = [...quad];
+	for( const [ang,from,to] of t_rules ) {
+		total_ang += ang;
+		if( ang != 0 ) {
+			rot = trot( radians( total_ang ) );
+			for( i = 0; i < 4; ++i ) {
+				tquad[i] = transPt( rot, quad[i] );
+			}
+		}
+
+		const ttt = transTo( tquad[to],
+			transPt( Ts[Ts.length-1], quad[from] ) );
+		Ts.push( mul( ttt, rot ) );
+	}
+
+	for( let idx = 0; idx < Ts.length; ++idx ) {
+		Ts[idx] = mul( R, Ts[idx] );
+	}
+
+	// Now build the actual supertiles, labelling appropriately.
+	const super_rules = {
+		'Gamma' :  ['Pi','Delta','null','Theta','Sigma','Xi','Phi','Gamma'],
+		'Delta' :  ['Xi','Delta','Xi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Theta' :  ['Psi','Delta','Pi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Lambda' : ['Psi','Delta','Xi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Xi' :     ['Psi','Delta','Pi','Phi','Sigma','Psi','Phi','Gamma'],
+		'Pi' :     ['Psi','Delta','Xi','Phi','Sigma','Psi','Phi','Gamma'],
+		'Sigma' :  ['Xi','Delta','Xi','Phi','Sigma','Pi','Lambda','Gamma'],
+		'Phi' :    ['Psi','Delta','Psi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Psi' :    ['Psi','Delta','Psi','Phi','Sigma','Psi','Phi','Gamma'] };
+	const super_quad = [
+		transPt( Ts[6], quad[2] ),
+		transPt( Ts[5], quad[1] ),
+		transPt( Ts[3], quad[2] ),
+		transPt( Ts[0], quad[1] ) ];
+
+	const ret = {};
+
+	for( const [lab, subs] of Object.entries( super_rules ) ) {
+		const sup = new Meta();
+		for( let idx = 0; idx < 8; ++idx ) {
+			if( subs[idx] == 'null' ) {
+				continue;
+			}
+			sup.addChild( sys[subs[idx]], Ts[idx] );
+		}
+		sup.quad = super_quad;
+        sup.calcRadius(); // Must calculate radius for culling
+		ret[lab] = sup;
+	}
+
+	return ret;
+}
+
+function setup() {
+	let canvas = createCanvas( windowWidth, windowHeight );
+	canvas.elt.style.touchAction = "none";
+
+	sys = buildSpectreBase();
+
+	let lab = createSpan( 'Shapes' );
+	lab.position( 10, 10 );
+	lab.size( 125, 15 );
+
+	shape_sel = createSelect();
+	shape_sel.position( 10, 30 );
+	shape_sel.size( 125, 25 );
+	shape_sel.option( 'Tile(1,1)' );
+	shape_sel.option( 'Spectres' );
+	shape_sel.option( 'Hexagons' );
+	shape_sel.option( 'Turtles in Hats' );
+	shape_sel.option( 'Hats in Turtles' );
+	shape_sel.changed( function() {
+		const s = shape_sel.value();
+		if( s == 'Hexagons' ) {
+			sys = buildHexBase();
+		} else if( s == 'Turtles in Hats' ) {
+			sys = buildHatTurtleBase( true );
+		} else if( s == 'Hats in Turtles' ) {
+			sys = buildHatTurtleBase( false );
+		} else if( s == 'Spectres' ) {
+			sys = buildSpectreBase( true );
+		} else {
+			sys = buildSpectreBase( false );
+		}
+		to_screen = [20, 0, 0, 0, -20, 0];
+		lw_scale = 1;
+        gen_level = 0;
+		loop();
+	} );
+
+    // Replaced Button with Counter Display
+	let count_lab = createSpan( 'Tiles in View:' );
+	count_lab.position( 10, 60 );
+	count_lab.size( 125, 15 );
+    
+    tile_count_span = createSpan( '0' );
+    tile_count_span.position( 10, 80 );
+    tile_count_span.style('font-size', '16px');
+    tile_count_span.style('font-weight', 'bold');
+
+	lab = createSpan( 'Category' );
+	lab.position( 10, 110 );
+	lab.size( 125, 15 );
+
+	tile_sel = createSelect();
+	tile_sel.position( 10, 130 );
+	tile_sel.size( 125, 25 );
+	for( let name of tile_names ) {
+		tile_sel.option( name );
+	}
+	tile_sel.value( 'Delta' );
+	tile_sel.changed( loop );
+
+	lab = createSpan( 'Colours' );
+	lab.position( 10, 160 );
+	lab.size( 125, 15 );
+
+	colscheme_sel = createSelect();
+	colscheme_sel.position( 10, 180 );
+	colscheme_sel.size( 125, 25 );
+	colscheme_sel.option( 'Pride' );
+	colscheme_sel.option( 'Mystics' );
+	colscheme_sel.option( 'Figure 5.3' );
+	colscheme_sel.option( 'Bright' );
+	colscheme_sel.option( 'White' );
+	colscheme_sel.changed( loop );
+
+	let save_button = createButton( "Save PNG" );
+	save_button.position( 10, 220 );
+	save_button.size( 125, 25 );
+	save_button.mousePressed( function () {
+		uibox = false;
+		draw();
+		save( "output.png" );
+		uibox = true;
+		draw();
+	} );
+
+	let svg_button = createButton( "Save SVG" );
+	svg_button.position( 10, 250 );
+	svg_button.size( 125, 25 );
+    svg_button.mousePressed( function () {
+        const stream = [];
+        stream.push( `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">` );
+		stream.push( `<g transform="translate(${width/2},${height/2})">` );
+
+		draw_counter = 1;
+		sys[tile_sel.value()].streamSVG( to_screen, stream );
+
+        stream.push( '</g>' );
+        stream.push( '</svg>' );
+
+        saveStrings( stream, 'output', 'svg' );
+    } );
+
+	number_checkbox = createCheckbox('Number Tiles', false);
+	number_checkbox.position( 10, 290 );
+	number_checkbox.changed( loop );
+}
+
+function draw()
+{
+	background( 255 );
+
+    // AUTO-EXPANSION LOGIC
+    // 1. Calculate the corners of the viewport in World Space
+    const inv_s = inv(to_screen);
+    // Center point in world space
+    const center_w = transPt(inv_s, {x:0, y:0}); // Relative to 0,0, but we want relative to canvas center
+    // Let's just find the max distance from origin (0,0 world) to any screen corner
+    // Screen corners relative to screen center:
+    const corners = [
+        pt(-width/2, -height/2),
+        pt(width/2, -height/2),
+        pt(width/2, height/2),
+        pt(-width/2, height/2)
+    ];
+    
+    let max_dist_w = 0;
+    for(let c of corners) {
+        // Transform screen corner to world
+        const w = transPt(inv_s, c);
+        const d = Math.hypot(w.x, w.y);
+        if(d > max_dist_w) max_dist_w = d;
+    }
+    
+    // 2. Compare with current supertile radius
+    let current_tile = sys[tile_sel.value()];
+    
+    // 3. Expand if necessary (and safe)
+    let loop_guard = 0;
+    while(current_tile.radius < max_dist_w && gen_level < MAX_GEN_LEVEL && loop_guard < 5) {
+        sys = buildSupertiles(sys);
+        gen_level++;
+        current_tile = sys[tile_sel.value()];
+        loop_guard++;
+    }
+
+	push();
+	translate( width/2, height/2 );
+
+	applyMatrix(
+		to_screen[0], to_screen[3],
+		to_screen[1], to_screen[4],
+		to_screen[2], to_screen[5] );
+
+	const s = colscheme_sel.value();
+	if( s == 'Figure 5.3' ) {
+		colmap = colmap53;
+	} else if( s == 'Bright' ) {
+		colmap = colmap_orig;
+	} else if( s == 'Pride' ) {
+		colmap = colmap_pride;
+	} else if( s == 'White' ) {
+		colmap = colmap_white;
+	} else {
+		colmap = colmap_mystics;
+	}
+
+	draw_counter = 1;
+    tiles_drawn_count = 0;
+	sys[tile_sel.value()].draw( ident );
+
+	pop();
+
+    // Update Counter
+    if (tile_count_span) {
+        tile_count_span.html(tiles_drawn_count);
+    }
+
+	if( uibox ) {
+		stroke( 0 );
+		strokeWeight( 0.5 );
+		fill( 255, 220 );
+		rect( 5, 5, 135, 335 );
+	}
+	noLoop();
+}
+
+function windowResized()
+{
+	resizeCanvas( windowWidth, windowHeight );
+}
+
+function mouseWheel(event) {
+	const zoom = event.delta > 0 ? 0.9 : 1.1;
+	const mx = mouseX - width / 2;
+	const my = mouseY - height / 2;
+	const t1 = ttrans(mx, my);
+	const s = [zoom, 0, 0, 0, zoom, 0];
+	const t2 = ttrans(-mx, -my);
+	const op = mul(t1, mul(s, t2));
+	to_screen = mul(op, to_screen);
+	loop();
+	return false;
+}
+
+function mousePressed()
+{
+	if( mouseX < 150 && mouseY < 350 ) {
+		return;
+	}
+	dragging = true;
+	loop();
+}
+
+function mouseDragged()
+{
+	if (dragging && touches.length < 2) {
+		to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), to_screen );
+		loop();
+		return false;
+	}
+}
+
+function mouseReleased()
+{
+	dragging = false;
+	loop();
+}
+
+function touchStarted() {
+	if( mouseX < 150 && mouseY < 350 ) {
+		return;
+	}
+	if (touches.length === 2) {
+		prev_touch_dist = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+		prev_touch_center = pt((touches[0].x + touches[1].x)/2, (touches[0].y + touches[1].y)/2);
+	}
+	return false; 
+}
+
+function touchMoved() {
+	if( mouseX < 150 && mouseY < 350 ) {
+		return;
+	}
+	if (touches.length === 2) {
+		const current_dist = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+		const current_center = pt((touches[0].x + touches[1].x)/2, (touches[0].y + touches[1].y)/2);
+
+		if (prev_touch_dist > 0) {
+			const s = current_dist / prev_touch_dist;
+			const cx_prev = prev_touch_center.x - width/2;
+			const cy_prev = prev_touch_center.y - height/2;
+			const cx_curr = current_center.x - width/2;
+			const cy_curr = current_center.y - height/2;
+
+			const t_new = ttrans(cx_curr, cy_curr);
+			const sc_mat = [s, 0, 0, 0, s, 0];
+			const t_old = ttrans(-cx_prev, -cy_prev);
+
+			const op = mul(t_new, mul(sc_mat, t_old));
+			to_screen = mul(op, to_screen);
+		}
+
+		prev_touch_dist = current_dist;
+		prev_touch_center = current_center;
+		loop();
+		return false;
+	}
+	return false;
+}
+
+function touchEnded() {
+	if (touches.length < 2) {
+		prev_touch_dist = -1;
+		prev_touch_center = null;
+	}
+	return false;
+}
+
+</script>
+</head>
+<body style="margin: 0; padding: 0; overflow: hidden; touch-action: none;">
+</div>
+</body>
+</html>
