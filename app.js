@@ -429,7 +429,7 @@ class Shape {
         }
         
         const col = currentColorMap[this.label];
-        svgString += `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
+        svgString += `" stroke="black" stroke-width="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
         stream.push(svgString);
 
         if (numberCheckbox && numberCheckbox.checked()) {
@@ -575,7 +575,7 @@ class CurvyShape {
         }
         
         const col = currentColorMap[this.label];
-        svgString += `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
+        svgString += `" stroke="black" stroke-width="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
         stream.push(svgString);
 
         if (numberCheckbox && numberCheckbox.checked()) {
