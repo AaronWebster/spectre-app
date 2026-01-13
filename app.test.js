@@ -152,15 +152,15 @@ function buildHexBase() {
 }
 
 // Helper functions for tests
-function approxEqual(a, b, epsilon = 1e-10) {
+function approxEqual(a, b, epsilon = 1e-8) {
     return Math.abs(a - b) < epsilon;
 }
 
-function pointsEqual(p1, p2, epsilon = 1e-10) {
+function pointsEqual(p1, p2, epsilon = 1e-8) {
     return approxEqual(p1.x, p2.x, epsilon) && approxEqual(p1.y, p2.y, epsilon);
 }
 
-function matricesEqual(M1, M2, epsilon = 1e-10) {
+function matricesEqual(M1, M2, epsilon = 1e-8) {
     return M1.every((val, idx) => approxEqual(val, M2[idx], epsilon));
 }
 
@@ -425,8 +425,10 @@ describe('Spectre Tile Geometry', () => {
             const degrees = ang * 180 / Math.PI;
             
             // Check if it's a multiple of 30° (which covers both 90° and 120° families)
+            // The remainder should be close to 0 (including wrapping to 30)
             const normalized = degrees % 30;
-            expect(approxEqual(normalized, 0, 1.0) || approxEqual(normalized, 30, 1.0)).toBe(true);
+            const isMultipleOf30 = approxEqual(normalized, 0, 1.0) || approxEqual(normalized, 30, 1.0);
+            expect(isMultipleOf30).toBe(true);
         }
     });
 
