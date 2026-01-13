@@ -5,9 +5,7 @@ let lw_scale = 1;
 
 let sys;
 
-let scale_centre;
-let scale_start;
-let scale_ts;
+let initialPinchDist = -1;
 
 let reset_but;
 let tile_sel;
@@ -15,8 +13,6 @@ let shape_sel;
 let colscheme_sel;
 
 let subst_button;
-let translate_button;
-let scale_button;
 let dragging = false;
 let uibox = true;
 
@@ -64,20 +60,7 @@ const colmap_mystics = {
 	'Phi' : [247, 252, 248],
 	'Psi' : [247, 252, 248] };
 
-const colmap_pride = {
-	'Gamma' : [255, 255, 255],
-	'Gamma1' : [97, 57, 21], 
-	'Gamma2' : [0, 0, 0],
-	'Delta' : [2, 129, 33],
-	'Theta' : [0, 76, 255],
-	'Lambda' : [118, 0, 136],
-	'Xi' : [229, 0, 0],
-	'Pi' : [255, 175, 199],
-	'Sigma' : [115, 215, 238],
-	'Phi' : [255, 141, 0],
-	'Psi' : [255, 238, 0] };
-
-let colmap = colmap_pride;
+let colmap = colmap53;
 
 function pt( x, y )
 {
@@ -529,15 +512,7 @@ function buildSupertiles( sys )
 	return ret;
 }
 
-function isButtonActive( but )
-{
-	return but.elt.style.border.length > 0;
-}
 
-function setButtonActive( but, b )
-{
-	but.elt.style.border = (b ? "3px solid black" : "");
-}
 
 function setup() {
 	createCanvas( windowWidth, windowHeight );
@@ -615,31 +590,12 @@ function setup() {
 	colscheme_sel = createSelect();
 	colscheme_sel.position( 10, 170 );
 	colscheme_sel.size( 125, 25 );
-	colscheme_sel.option( 'Pride' );
-	colscheme_sel.option( 'Mystics' );
 	colscheme_sel.option( 'Figure 5.3' );
+	colscheme_sel.option( 'Mystics' );
 	colscheme_sel.option( 'Bright' );
+	colscheme_sel.value( 'Figure 5.3' );
 	colscheme_sel.changed( loop );
 
-	translate_button = createButton( "Translate" );
-	setButtonActive( translate_button, true );
-	translate_button.position( 10, 210 );
-	translate_button.size( 125, 25 );
-	translate_button.mousePressed( function() {
-		setButtonActive( translate_button, true );
-		setButtonActive( scale_button, false );
-		loop();
-	} );
-
-	scale_button = createButton( "Scale" );
-	scale_button.position( 10, 240 );
-	scale_button.size( 125, 25 );
-	scale_button.mousePressed( function() {
-		setButtonActive( translate_button, false );
-		setButtonActive( scale_button, true );
-		loop();
-	} );
-	
 	let save_button = createButton( "Save PNG" );
 	save_button.position( 10, 280 );
 	save_button.size( 125, 25 );
@@ -681,14 +637,12 @@ function draw()
 		to_screen[2], to_screen[5] );
 
 	const s = colscheme_sel.value();
-	if( s == 'Figure 5.3' ) {
-		colmap = colmap53;
-	} else if( s == 'Bright' ) {
+	if( s == 'Bright' ) {
 		colmap = colmap_orig;
-	} else if( s == 'Pride' ) {
-		colmap = colmap_pride;
-	} else {
+	} else if( s == 'Mystics' ) {
 		colmap = colmap_mystics;
+	} else {
+		colmap = colmap53;
 	}
 
 	sys[tile_sel.value()].draw();
@@ -712,30 +666,17 @@ function windowResized()
 function mousePressed()
 {
 	dragging = true;
-	if( isButtonActive( scale_button ) ) {
-		scale_centre = transPt( inv( to_screen ), pt( width/2, height/2 ) );
-		scale_start = pt( mouseX, mouseY );
-		scale_ts = [...to_screen];
-	}
 	loop();
 }
 
 function mouseDragged()
 {
+	// Prevent interference with touch logic if P5 mixes them
+	if (touches.length > 1) return false;
+
 	if( dragging ) {
-		if( isButtonActive( translate_button ) ) {
-			to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), 
-				to_screen );
-		} else if( isButtonActive( scale_button ) ) {
-			let sc = dist( mouseX, mouseY, width/2, height/2 ) / 
-				dist( scale_start.x, scale_start.y, width/2, height/2 );
-			to_screen = mul( 
-				mul( ttrans( scale_centre.x, scale_centre.y ),
-					mul( [sc, 0, 0, 0, sc, 0],
-						ttrans( -scale_centre.x, -scale_centre.y ) ) ),
-				scale_ts );
-			lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
-		}
+		to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), 
+			to_screen );
 		loop();
 		return false;
 	} 
@@ -745,5 +686,56 @@ function mouseReleased()
 {
 	dragging = false;
 	loop();
+}
+
+function mouseWheel(event) {
+	// Determine scale factor
+	let s = event.delta > 0 ? 0.9 : 1.1;
+	
+	// Zoom centered on viewport center (0,0 in centered screen space)
+	to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
+	
+	lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+	loop();
+	
+	// Prevent default browser scroll
+	return false;
+}
+
+function touchStarted() {
+	if (touches.length === 2) {
+		initialPinchDist = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+	}
+	dragging = true;
+}
+
+function touchMoved() {
+	if (touches.length === 1) {
+		// Single touch pan
+		to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), to_screen );
+	} else if (touches.length === 2) {
+		// Two finger pinch zoom relative to viewport center
+		let d = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
+		
+		if (initialPinchDist > 0 && d > 0) {
+			let s = d / initialPinchDist;
+			to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
+			lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+			initialPinchDist = d;
+		}
+	}
+	loop();
+	return false;
+}
+
+function touchEnded() {
+	// Reset dragging if no touches left
+	if (touches.length === 0) {
+		dragging = false;
+	}
+	// Reset pinch distance if not 2 fingers
+	if (touches.length !== 2) {
+		initialPinchDist = -1;
+	}
 }
 
