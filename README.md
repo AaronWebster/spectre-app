@@ -7,7 +7,7 @@ Interactive JavaScript application for exploring the Spectre tile from "A Chiral
 - Interactive visualization of the Spectre tile and related aperiodic tilings
 - Multiple tile types: Spectre, Hat/Turtle, and Hexagons
 - Dense tiling: viewport is always fully populated with tiles (no whitespace)
-- Efficient rendering with viewport culling for optimal performance
+- Viewport culling: tiles outside the visible area are not rendered for optimal performance
 - Zoom and pan controls (mouse wheel and drag, or pinch-to-zoom on touch devices)
 - Export to SVG format
 - Tile numbering option

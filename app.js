@@ -1004,8 +1004,8 @@ function draw() {
         toScreenTransform[2], toScreenTransform[5]
     );
 
-    // Update color scheme
-    updateColorScheme();
+    // Use white color scheme for all tiles
+    currentColorMap = COLOR_SCHEMES.white;
 
     // Draw tiles
     drawCounter = 1;
@@ -1056,6 +1056,8 @@ function autoExpandTiles() {
     
     // Add buffer for dense tiling: expand beyond viewport to ensure full coverage
     // Multiply by 1.5 to ensure tiles always fill the viewport with margin
+    // This value balances performance (avoiding excessive tile generation) with
+    // coverage (ensuring no whitespace appears during zoom/pan/resize)
     maxDistance *= 1.5;
     
     // Expand if necessary
@@ -1070,13 +1072,6 @@ function autoExpandTiles() {
         currentTile = tileSystem[tileSelector.value()];
         loopGuard++;
     }
-}
-
-/**
- * Updates the current color scheme (locked to white)
- */
-function updateColorScheme() {
-    currentColorMap = COLOR_SCHEMES.white;
 }
 
 /**
