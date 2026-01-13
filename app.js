@@ -14,13 +14,16 @@
 
 const IDENTITY_MATRIX = [1, 0, 0, 0, 1, 0];
 const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
-const DENSE_TILING_BUFFER = 1.5; // Multiplier for viewport coverage buffer
+
+// Dense tiling buffer: ensures complete tile coverage during zoom/pan/resize while
+// minimizing performance impact by limiting excessive generation to 50% beyond viewport
+const DENSE_TILING_BUFFER = 1.5;
 
 // UI layout constants
 const UI_BOX_X = 5;
 const UI_BOX_Y = 5;
 const UI_BOX_WIDTH = 135;
-const UI_BOX_HEIGHT = 235; // Height to contain all UI elements (last element at y=210 + ~25px)
+const UI_BOX_HEIGHT = 235; // Accommodates all UI elements (checkbox at y=210 + ~25px height)
 const UI_PADDING = 15; // Extra padding for interaction area beyond visible box
 const UI_INTERACTION_WIDTH = UI_BOX_WIDTH + UI_PADDING;
 const UI_INTERACTION_HEIGHT = UI_BOX_HEIGHT + UI_PADDING;
