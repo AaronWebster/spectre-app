@@ -763,3 +763,227 @@ describe('Edge Cases and Boundary Conditions', () => {
         expect(() => matchSeg(p, q)).not.toThrow();
     });
 });
+
+describe('Tile Counting', () => {
+    // Mock canvas context
+    const mockCtx = {
+        beginPath: jest.fn(),
+        moveTo: jest.fn(),
+        lineTo: jest.fn(),
+        closePath: jest.fn(),
+        fill: jest.fn(),
+        stroke: jest.fn(),
+        save: jest.fn(),
+        restore: jest.fn(),
+        transform: jest.fn(),
+        bezierCurveTo: jest.fn(),
+        fillStyle: '',
+        strokeStyle: '',
+        lineWidth: 0
+    };
+
+    // Mock color map
+    const mockColmap = {
+        'Gamma': [255, 255, 255],
+        'Gamma1': [255, 255, 255],
+        'Gamma2': [255, 255, 255],
+        'Delta': [220, 220, 220]
+    };
+
+    // Helper to create a simple polygon
+    function createSimplePolygon() {
+        return [
+            pt(0, 0),
+            pt(1, 0),
+            pt(1, 1),
+            pt(0, 1)
+        ];
+    }
+
+    // Mock Shape class with counter
+    class MockShape {
+        constructor(pts, quad, label) {
+            this.pts = pts;
+            this.quad = quad;
+            this.label = label;
+        }
+
+        draw(ctx, counter) {
+            counter.count++;
+            return counter.count;
+        }
+    }
+
+    // Mock CurvyShape class with counter
+    class MockCurvyShape {
+        constructor(pts, quad, label) {
+            this.quad = quad;
+            this.label = label;
+            this.pts = pts;
+        }
+
+        draw(ctx, counter) {
+            counter.count++;
+            return counter.count;
+        }
+    }
+
+    // Mock Meta class with counter
+    class MockMeta {
+        constructor() {
+            this.geoms = [];
+            this.quad = [];
+        }
+
+        addChild(g, T) {
+            this.geoms.push({ geom: g, xform: T });
+        }
+
+        draw(ctx, counter) {
+            for (let g of this.geoms) {
+                g.geom.draw(ctx, counter);
+            }
+            return counter.count;
+        }
+    }
+
+    test('Shape.draw() increments counter by 1', () => {
+        const shape = new MockShape(
+            createSimplePolygon(),
+            [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)],
+            'Delta'
+        );
+        const counter = { count: 0 };
+        
+        shape.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(1);
+    });
+
+    test('CurvyShape.draw() increments counter by 1', () => {
+        const shape = new MockCurvyShape(
+            createSimplePolygon(),
+            [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)],
+            'Delta'
+        );
+        const counter = { count: 0 };
+        
+        shape.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(1);
+    });
+
+    test('Multiple Shape draws accumulate count', () => {
+        const shape1 = new MockShape(createSimplePolygon(), [], 'Delta');
+        const shape2 = new MockShape(createSimplePolygon(), [], 'Delta');
+        const shape3 = new MockShape(createSimplePolygon(), [], 'Delta');
+        const counter = { count: 0 };
+        
+        shape1.draw(mockCtx, counter);
+        shape2.draw(mockCtx, counter);
+        shape3.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(3);
+    });
+
+    test('Meta with single child counts correctly', () => {
+        const meta = new MockMeta();
+        const shape = new MockShape(createSimplePolygon(), [], 'Delta');
+        meta.addChild(shape, ident);
+        const counter = { count: 0 };
+        
+        meta.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(1);
+    });
+
+    test('Meta with multiple children counts all tiles', () => {
+        const meta = new MockMeta();
+        const shape1 = new MockShape(createSimplePolygon(), [], 'Delta');
+        const shape2 = new MockShape(createSimplePolygon(), [], 'Gamma');
+        const shape3 = new MockCurvyShape(createSimplePolygon(), [], 'Delta');
+        
+        meta.addChild(shape1, ident);
+        meta.addChild(shape2, ident);
+        meta.addChild(shape3, ident);
+        
+        const counter = { count: 0 };
+        meta.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(3);
+    });
+
+    test('Nested Meta structures count recursively', () => {
+        const outerMeta = new MockMeta();
+        const innerMeta = new MockMeta();
+        
+        const shape1 = new MockShape(createSimplePolygon(), [], 'Delta');
+        const shape2 = new MockShape(createSimplePolygon(), [], 'Gamma');
+        const shape3 = new MockShape(createSimplePolygon(), [], 'Delta');
+        
+        innerMeta.addChild(shape1, ident);
+        innerMeta.addChild(shape2, ident);
+        
+        outerMeta.addChild(innerMeta, ident);
+        outerMeta.addChild(shape3, ident);
+        
+        const counter = { count: 0 };
+        outerMeta.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(3);
+    });
+
+    test('Counter resets properly between draws', () => {
+        const shape = new MockShape(createSimplePolygon(), [], 'Delta');
+        
+        // First draw
+        let counter1 = { count: 0 };
+        shape.draw(mockCtx, counter1);
+        expect(counter1.count).toBe(1);
+        
+        // Second draw with reset counter
+        let counter2 = { count: 0 };
+        shape.draw(mockCtx, counter2);
+        expect(counter2.count).toBe(1);
+    });
+
+    test('Complex substitution system counts correctly', () => {
+        // Simulate a supertile with 8 sub-tiles (like in buildSupertiles)
+        const supertile = new MockMeta();
+        
+        for (let i = 0; i < 8; i++) {
+            supertile.addChild(
+                new MockShape(createSimplePolygon(), [], 'Delta'),
+                ident
+            );
+        }
+        
+        const counter = { count: 0 };
+        supertile.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(8);
+    });
+
+    test('Mixed Shape and CurvyShape types count correctly', () => {
+        const meta = new MockMeta();
+        
+        meta.addChild(new MockShape(createSimplePolygon(), [], 'Delta'), ident);
+        meta.addChild(new MockCurvyShape(createSimplePolygon(), [], 'Gamma'), ident);
+        meta.addChild(new MockShape(createSimplePolygon(), [], 'Delta'), ident);
+        meta.addChild(new MockCurvyShape(createSimplePolygon(), [], 'Gamma'), ident);
+        
+        const counter = { count: 0 };
+        meta.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(4);
+    });
+
+    test('Empty Meta returns zero count', () => {
+        const meta = new MockMeta();
+        const counter = { count: 0 };
+        
+        meta.draw(mockCtx, counter);
+        
+        expect(counter.count).toBe(0);
+    });
+});

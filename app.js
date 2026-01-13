@@ -14,8 +14,11 @@ let canvas, ctx;
 let width, height;
 let needsRedraw = true;
 
+// Tile counter
+let tileCount = 0;
+
 // UI Elements
-let tile_sel, shape_sel, colscheme_sel;
+let tile_sel, shape_sel, colscheme_sel, tile_count_label;
 
 const tile_names = [ 
 	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
@@ -148,6 +151,7 @@ class Shape {
 
 	draw(ctx) {
 		drawPolygon( ctx, this.pts, colmap[this.label], [0,0,0], 0.1 );
+		tileCount++;
 	}
 
 	streamSVG( S, stream ) {
@@ -204,6 +208,7 @@ class CurvyShape {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+		tileCount++;
 	}
 
 	streamSVG( S, stream ) {
@@ -526,6 +531,9 @@ function createUI() {
         link.download = "output.svg";
         link.click();
     });
+    
+    // Tile Count Label
+    tile_count_label = addLabel('Tiles: 0', 10, 270);
 }
 
 function addLabel(text, x, y) {
@@ -710,6 +718,9 @@ function onTouchEnd(e) {
 
 // ... Draw ...
 function draw() {
+    // Reset tile counter
+    tileCount = 0;
+    
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = 'white';
@@ -746,5 +757,10 @@ function draw() {
         ctx.lineWidth = 0.5;
         ctx.fillRect(5, 5, 135, 275); // Adjusted height for fewer buttons
         ctx.strokeRect(5, 5, 135, 275);
+    }
+    
+    // Update tile count display
+    if(tile_count_label) {
+        tile_count_label.innerText = `Tiles: ${tileCount}`;
     }
 }
