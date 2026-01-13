@@ -1,26 +1,26 @@
-const ident = [1,0,0,0,1,0];
+// app.js - Modern HTML5 Canvas Version
 
+const ident = [1,0,0,0,1,0];
 let to_screen = [20, 0, 0, 0, -20, 0];
 let lw_scale = 1;
-
 let sys;
-
-let initialPinchDist = -1;
-
-let reset_but;
-let tile_sel;
-let shape_sel;
-let colscheme_sel;
-
-let subst_button;
 let dragging = false;
 let uibox = true;
+let initialPinchDist = -1;
+let lastMouseX = 0, lastMouseY = 0;
+
+// Canvas and Context
+let canvas, ctx;
+let width, height;
+let needsRedraw = true;
+
+// UI Elements
+let tile_sel, shape_sel, colscheme_sel;
 
 const tile_names = [ 
 	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
 	'Pi', 'Sigma', 'Phi', 'Psi' ];
 
-// Color map from Figure 5.3
 const colmap53 = {
 	'Gamma' : [203, 157, 126],
 	'Gamma1' : [203, 157, 126],
@@ -62,21 +62,23 @@ const colmap_mystics = {
 
 let colmap = colmap53;
 
-function pt( x, y )
-{
-	return { x : x, y : y };
-}
+// Math Helpers
+const PI = Math.PI;
+const cos = Math.cos;
+const sin = Math.sin;
+function radians(d) { return d * PI / 180; }
+function dist(x1, y1, x2, y2) { return Math.hypot(x2-x1, y2-y1); }
+function mag(x, y) { return Math.hypot(x, y); }
 
-// Affine matrix inverse
+function pt( x, y ) { return { x : x, y : y }; }
+
 function inv( T ) {
 	const det = T[0]*T[4] - T[1]*T[3];
 	return [T[4]/det, -T[1]/det, (T[1]*T[5]-T[2]*T[4])/det,
 		-T[3]/det, T[0]/det, (T[2]*T[3]-T[0]*T[5])/det];
 };
 
-// Affine matrix multiply
-function mul( A, B )
-{
+function mul( A, B ) {
 	return [A[0]*B[0] + A[1]*B[3], 
 		A[0]*B[1] + A[1]*B[4],
 		A[0]*B[2] + A[1]*B[5] + A[2],
@@ -86,132 +88,87 @@ function mul( A, B )
 		A[3]*B[2] + A[4]*B[5] + A[5]];
 }
 
-function padd( p, q )
-{
-	return { x : p.x + q.x, y : p.y + q.y };
-}
+function padd( p, q ) { return { x : p.x + q.x, y : p.y + q.y }; }
+function psub( p, q ) { return { x : p.x - q.x, y : p.y - q.y }; }
+function pframe( o, p, q, a, b ) { return { x : o.x + a*p.x + b*q.x, y : o.y + a*p.y + b*q.y }; }
 
-function psub( p, q )
-{
-	return { x : p.x - q.x, y : p.y - q.y };
-}
-
-function pframe( o, p, q, a, b )
-{
-	return { x : o.x + a*p.x + b*q.x, y : o.y + a*p.y + b*q.y };
-}
-
-// Rotation matrix
-function trot( ang )
-{
+function trot( ang ) {
 	const c = cos( ang );
 	const s = sin( ang );
 	return [c, -s, 0, s, c, 0];
 }
 
-// Translation matrix
-function ttrans( tx, ty )
-{
-	return [1, 0, tx, 0, 1, ty];
-}
+function ttrans( tx, ty ) { return [1, 0, tx, 0, 1, ty]; }
+function transTo( p, q ) { return ttrans( q.x - p.x, q.y - p.y ); }
 
-function transTo( p, q )
-{
-	return ttrans( q.x - p.x, q.y - p.y );
-}
-
-function rotAbout( p, ang )
-{
+function rotAbout( p, ang ) {
 	return mul( ttrans( p.x, p.y ), 
 		mul( trot( ang ), ttrans( -p.x, -p.y ) ) );
 }
 
-// Matrix * point
-function transPt( M, P )
-{
+function transPt( M, P ) {
 	return pt(M[0]*P.x + M[1]*P.y + M[2], M[3]*P.x + M[4]*P.y + M[5]);
 }
 
-// Match unit interval to line segment p->q
-function matchSeg( p, q )
-{
+function matchSeg( p, q ) {
 	return [q.x-p.x, p.y-q.y, p.x,  q.y-p.y, q.x-p.x, p.y];
 };
 
-// Match line segment p1->q1 to line segment p2->q2
-function matchTwo( p1, q1, p2, q2 )
-{
+function matchTwo( p1, q1, p2, q2 ) {
 	return mul( matchSeg( p2, q2 ), inv( matchSeg( p1, q1 ) ) );
 };
 
-function drawPolygon( shape, f, s, w )
-{
+// Drawing Helpers
+function drawPolygon( ctx, shape, f, s, w ) {
+    ctx.beginPath();
+    ctx.moveTo(shape[0].x, shape[0].y);
+    for(let i=1; i<shape.length; i++) {
+        ctx.lineTo(shape[i].x, shape[i].y);
+    }
+    ctx.closePath();
+    
 	if( f != null ) {
-		fill( ...f );
-	} else {
-		noFill();
-	}
+		ctx.fillStyle = `rgb(${f[0]},${f[1]},${f[2]})`;
+        ctx.fill();
+	} 
 	if( s != null ) {
-		stroke( 0 );
-		strokeWeight( w ) ; // / lw_scale );
-	} else {
-		noStroke();
-	}
-	beginShape();
-	for( let p of shape ) {
-		vertex( p.x, p.y );
-	}
-	endShape( CLOSE );
+		ctx.strokeStyle = `rgb(${s[0]},${s[1]},${s[2]})`;
+		ctx.lineWidth = w;
+        ctx.stroke();
+	} 
 }
 
-function streamPolygon( shape, T, f, s, w )
-{
-
-}
-
-class Shape
-{
-	constructor( pts, quad, label )
-	{
+// Classes
+class Shape {
+	constructor( pts, quad, label ) {
 		this.pts = pts;
 		this.quad = quad;
 		this.label = label;
 	}
 
-	draw()
-	{
-		drawPolygon( this.pts, colmap[this.label], [0,0,0], 0.1 );
+	draw(ctx) {
+		drawPolygon( ctx, this.pts, colmap[this.label], [0,0,0], 0.1 );
 	}
 
-	streamSVG( S, stream )
-	{
+	streamSVG( S, stream ) {
 		var s = '<polygon points="';
 		var at_start = true;
 		for( let p of this.pts ) {
 			const sp = transPt( S, p );
-			if( at_start ) {
-				at_start = false;
-			} else {
-				s = s + ' ';
-			}
+			if( at_start ) { at_start = false; } else { s = s + ' '; }
 			s = s + `${sp.x},${sp.y}`;
 		}
 		const col = colmap[this.label];
-
 		s = s + `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
 		stream.push( s );
 	}
 }
 
-class CurvyShape
-{
-	constructor( pts, quad, label )
-	{
+class CurvyShape {
+	constructor( pts, quad, label ) {
 		this.quad = quad;
 		this.label = label;
-
 		let blah = true;
-
 		this.pts = [pts[pts.length-1]];
 		for( const p of pts ) {
 			const prev = this.pts[this.pts.length-1];
@@ -229,78 +186,66 @@ class CurvyShape
 		}
 	}
 
-	draw()
-	{
-		fill( ...colmap[this.label] );
-		strokeWeight( 0.1 );
-		stroke( 0 );
+	draw(ctx) {
+        const col = colmap[this.label];
+		ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+		ctx.strokeStyle = "rgb(0,0,0)";
+        ctx.lineWidth = 0.1;
 
-		beginShape();
-		vertex( this.pts[0].x, this.pts[0].y );
+		ctx.beginPath();
+		ctx.moveTo( this.pts[0].x, this.pts[0].y );
 
 		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
 			const a = this.pts[idx];
 			const b = this.pts[idx+1];
 			const c = this.pts[idx+2];
-
-			bezierVertex( a.x, a.y, b.x, b.y, c.x, c.y );
+			ctx.bezierCurveTo( a.x, a.y, b.x, b.y, c.x, c.y );
 		}
-		endShape( CLOSE );
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
 	}
 
-	streamSVG( S, stream )
-	{
+	streamSVG( S, stream ) {
 		const tp = transPt( S, this.pts[0] );
-		vertex( tp.x, tp.y );
-
 		var s = `<path d="M ${tp.x} ${tp.y}`;
-		
 		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
 			const a = transPt( S, this.pts[idx] );
 			const b = transPt( S, this.pts[idx+1] );
 			const c = transPt( S, this.pts[idx+2] );
-
 			s = s + ` C ${a.x} ${a.y} ${b.x} ${b.y} ${c.x} ${c.y}`;	
 		}
 		const col = colmap[this.label];
-
 		s = s + `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
 		stream.push( s );
 	}
 }
 
-class Meta
-{
-	constructor()
-	{
+class Meta {
+	constructor() {
 		this.geoms = [];
 		this.quad = [];
 	}
-
-	addChild( g, T )
-	{
+	addChild( g, T ) {
 		this.geoms.push( { geom : g, xform: T } );
 	}
-
-	draw() 
-	{
+	draw(ctx) {
 		for( let g of this.geoms ) {
-			push();
+			ctx.save();
 			const M = g.xform;
-			applyMatrix( M[0], M[3], M[1], M[4], M[2], M[5] );
-			g.geom.draw();
-			pop();
+			ctx.transform( M[0], M[3], M[1], M[4], M[2], M[5] );
+			g.geom.draw(ctx);
+			ctx.restore();
 		}
 	}
-
-	streamSVG( S, stream )
-	{
+	streamSVG( S, stream ) {
 		for( let g of this.geoms ) {
 			g.geom.streamSVG( mul( S, g.xform ), stream );
 		}
 	}
 }
 
+// Builders
 function buildSpectreBase( curved )
 {
 	const spectre = [
@@ -444,10 +389,6 @@ function buildHexBase()
 
 function buildSupertiles( sys )
 {
-	// First, use any of the nine-unit tiles in sys to obtain
-	// a list of transformation matrices for placing tiles within
-	// supertiles.
-
 	const quad = sys['Delta'].quad;
 	const R = [-1,0,0,0,1,0];
 	
@@ -477,7 +418,6 @@ function buildSupertiles( sys )
 		Ts[idx] = mul( R, Ts[idx] );
 	}
 
-	// Now build the actual supertiles, labelling appropriately.
 	const super_rules = {
 		'Gamma' :  ['Pi','Delta','null','Theta','Sigma','Xi','Phi','Gamma'],
 		'Delta' :  ['Xi','Delta','Xi','Phi','Sigma','Pi','Phi','Gamma'],
@@ -512,27 +452,17 @@ function buildSupertiles( sys )
 	return ret;
 }
 
-
-
-function setup() {
-	createCanvas( windowWidth, windowHeight );
-
-	sys = buildSpectreBase();
-
-	let lab = createSpan( 'Shapes' );
-	lab.position( 10, 10 );
-	lab.size( 125, 15 );
-
-	shape_sel = createSelect();
-	shape_sel.position( 10, 30 );
-	shape_sel.size( 125, 25 );
-	shape_sel.option( 'Tile(1,1)' );
-	shape_sel.option( 'Spectres' );
-	shape_sel.option( 'Hexagons' );
-	shape_sel.option( 'Turtles in Hats' );
-	shape_sel.option( 'Hats in Turtles' );
-	shape_sel.changed( function() {
-		const s = shape_sel.value();
+// UI Creation
+function createUI() {
+    // Shapes Label and Select
+    addLabel('Shapes', 10, 10);
+    shape_sel = addSelect(10, 30, [
+        'Tile(1,1)', 'Spectres', 'Hexagons', 
+        'Turtles in Hats', 'Hats in Turtles'
+    ], 'Spectres'); // Default
+    
+    shape_sel.addEventListener('change', () => {
+		const s = shape_sel.value;
 		if( s == 'Hexagons' ) {
 			sys = buildHexBase();
 		} else if( s == 'Turtles in Hats' ) {
@@ -546,97 +476,253 @@ function setup() {
 		}
 		to_screen = [20, 0, 0, 0, -20, 0];
 		lw_scale = 1;
-		loop();
-	} );
+        needsRedraw = true;
+    });
 
+    // Subst Button
+    const subst_btn = addButton('Build Supertiles', 10, 60, () => {
+        sys = buildSupertiles( sys );
+        needsRedraw = true;
+    });
 
-/*
-	reset_but = createButton( "Reset" );
-	reset_but.position( 10, 10 );
-	reset_but.size( 125, 25 );
-	reset_but.mousePressed( function() {
-		sys = buildSpectreBase();
-		to_screen = [20, 0, 0, 0, -20, 0];
-		lw_scale = 0.2;
-		loop();
-	} );
-	*/
+    // Category Label and Select
+    addLabel('Category', 10, 100);
+    tile_sel = addSelect(10, 120, tile_names, 'Delta');
+    tile_sel.addEventListener('change', () => { needsRedraw = true; });
 
-	subst_button = createButton( "Build Supertiles" );
-	subst_button.position( 10, 60 );
-	subst_button.size( 125, 25 );
-	subst_button.mousePressed( function() {
-		sys = buildSupertiles( sys );	
-		loop();
-	} );
+    // Colors Label and Select
+    addLabel('Colours', 10, 150);
+    colscheme_sel = addSelect(10, 170, [
+        'Figure 5.3', 'Mystics', 'Bright'
+    ], 'Figure 5.3');
+    colscheme_sel.addEventListener('change', () => { needsRedraw = true; });
 
-	lab = createSpan( 'Category' );
-	lab.position( 10, 100 );
-	lab.size( 125, 15 );
+    // Save PNG
+    addButton('Save PNG', 10, 210, () => {
+        uibox = false;
+        draw();
+        const link = document.createElement('a');
+        link.download = 'output.png';
+        link.href = canvas.toDataURL();
+        link.click();
+        uibox = true;
+        needsRedraw = true;
+    });
 
-	tile_sel = createSelect();
-	tile_sel.position( 10, 120 );
-	tile_sel.size( 125, 25 );
-	for( let name of tile_names ) {
-		tile_sel.option( name );
-	}
-	tile_sel.value( 'Delta' );
-	tile_sel.changed( loop );
-
-	lab = createSpan( 'Colours' );
-	lab.position( 10, 150 );
-	lab.size( 125, 15 );
-
-	colscheme_sel = createSelect();
-	colscheme_sel.position( 10, 170 );
-	colscheme_sel.size( 125, 25 );
-	colscheme_sel.option( 'Figure 5.3' );
-	colscheme_sel.option( 'Mystics' );
-	colscheme_sel.option( 'Bright' );
-	colscheme_sel.value( 'Figure 5.3' );
-	colscheme_sel.changed( loop );
-
-	let save_button = createButton( "Save PNG" );
-	save_button.position( 10, 280 );
-	save_button.size( 125, 25 );
-	save_button.mousePressed( function () {
-		uibox = false;
-		draw();
-		save( "output.png" );
-		uibox = true;
-		draw();
-	} );
-
-	let svg_button = createButton( "Save SVG" );
-	svg_button.position( 10, 310 );
-	svg_button.size( 125, 25 );
-    svg_button.mousePressed( function () {
+    // Save SVG
+    addButton('Save SVG', 10, 240, () => {
         const stream = [];
         stream.push( `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">` );
 		stream.push( `<g transform="translate(${width/2},${height/2})">` );
 
-		sys[tile_sel.value()].streamSVG( to_screen, stream );
+		sys[tile_sel.value].streamSVG( to_screen, stream );
 
         stream.push( '</g>' );
         stream.push( '</svg>' );
-
-        saveStrings( stream, 'output', 'svg' );
-    } );
+        
+        const blob = new Blob(stream, {type: "image/svg+xml;charset=utf-8"});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = "output.svg";
+        link.click();
+    });
 }
 
-function draw()
-{
-	background( 255 );
+function addLabel(text, x, y) {
+    const el = document.createElement('span');
+    el.innerText = text;
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.fontFamily = 'sans-serif';
+    el.style.fontSize = '12px';
+    document.body.appendChild(el);
+    return el;
+}
 
-	push();
-	translate( width/2, height/2 );
+function addSelect(x, y, options, def) {
+    const el = document.createElement('select');
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.width = '125px';
+    el.style.height = '25px';
+    for(const opt of options) {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.text = opt;
+        el.appendChild(o);
+    }
+    el.value = def;
+    document.body.appendChild(el);
+    return el;
+}
 
-	applyMatrix( 
-		to_screen[0], to_screen[3], 
-		to_screen[1], to_screen[4], 
-		to_screen[2], to_screen[5] );
+function addButton(text, x, y, onclick) {
+    const el = document.createElement('button');
+    el.innerText = text;
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.width = '125px';
+    el.style.height = '25px';
+    el.addEventListener('click', onclick);
+    document.body.appendChild(el);
+    return el;
+}
 
-	const s = colscheme_sel.value();
+// Initialization
+window.addEventListener('DOMContentLoaded', init);
+
+function init() {
+    // Create canvas
+    canvas = document.createElement('canvas');
+    ctx = canvas.getContext('2d', { alpha: false });
+    document.body.appendChild(canvas);
+    
+    // Resize handler
+    window.addEventListener('resize', onResize);
+    onResize();
+
+    // Create UI
+    createUI();
+
+    // Init Logic - Default to Spectres
+    sys = buildSpectreBase(true); // Default to Spectres based on UI default
+    // Wait, createUI sets Spectres default, but change listener not fired.
+    // Let's match default manually.
+    // UI default 'Spectres' -> buildSpectreBase(true)
+    
+    // Event Listeners
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('wheel', onWheel, {passive: false});
+    
+    canvas.addEventListener('touchstart', onTouchStart, {passive: false});
+    canvas.addEventListener('touchmove', onTouchMove, {passive: false});
+    canvas.addEventListener('touchend', onTouchEnd, {passive: false});
+
+    // Loop
+    requestAnimationFrame(loop);
+}
+
+function onResize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    needsRedraw = true;
+}
+
+function loop() {
+    if(needsRedraw) {
+        draw();
+        needsRedraw = false;
+    }
+    requestAnimationFrame(loop);
+}
+
+// Input Handlers
+function onMouseDown(e) {
+    dragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    needsRedraw = true;
+}
+
+function onMouseMove(e) {
+    if(dragging) {
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        
+        to_screen = mul( ttrans( dx, dy ), to_screen );
+        needsRedraw = true;
+    }
+}
+
+function onMouseUp(e) {
+    dragging = false;
+    needsRedraw = true;
+}
+
+function onWheel(e) {
+    e.preventDefault();
+    let s = e.deltaY > 0 ? 0.9 : 1.1;
+	
+    // Center zoom
+	to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
+	lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+    
+    needsRedraw = true;
+}
+
+function onTouchStart(e) {
+    if (e.touches.length === 2) {
+		initialPinchDist = dist(e.touches[0].clientX, e.touches[0].clientY, e.touches[1].clientX, e.touches[1].clientY);
+	}
+    if (e.touches.length === 1) {
+        lastMouseX = e.touches[0].clientX;
+        lastMouseY = e.touches[0].clientY;
+    }
+	dragging = true;
+}
+
+function onTouchMove(e) {
+    e.preventDefault();
+	if (e.touches.length === 1) {
+		// Single touch pan
+        const dx = e.touches[0].clientX - lastMouseX;
+        const dy = e.touches[0].clientY - lastMouseY;
+        lastMouseX = e.touches[0].clientX;
+        lastMouseY = e.touches[0].clientY;
+        
+		to_screen = mul( ttrans( dx, dy ), to_screen );
+        needsRedraw = true;
+	} else if (e.touches.length === 2) {
+		// Two finger pinch zoom
+		let d = dist(e.touches[0].clientX, e.touches[0].clientY, e.touches[1].clientX, e.touches[1].clientY);
+		
+		if (initialPinchDist > 0 && d > 0) {
+			let s = d / initialPinchDist;
+			to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
+			lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+			initialPinchDist = d;
+            needsRedraw = true;
+		}
+	}
+}
+
+function onTouchEnd(e) {
+    if (e.touches.length === 0) {
+		dragging = false;
+	}
+	if (e.touches.length !== 2) {
+		initialPinchDist = -1;
+	}
+    if (e.touches.length === 1) {
+        lastMouseX = e.touches[0].clientX;
+        lastMouseY = e.touches[0].clientY;
+    }
+}
+
+// ... Draw ...
+function draw() {
+    // Clear
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.save();
+    // Center logic
+    ctx.translate(width/2, height/2);
+    // Apply to_screen
+    ctx.transform(to_screen[0], to_screen[3], to_screen[1], to_screen[4], to_screen[2], to_screen[5]);
+
+    // Handle Color Map
+    const s = colscheme_sel.value;
 	if( s == 'Bright' ) {
 		colmap = colmap_orig;
 	} else if( s == 'Mystics' ) {
@@ -645,97 +731,20 @@ function draw()
 		colmap = colmap53;
 	}
 
-	sys[tile_sel.value()].draw();
+    // Draw System
+    if(sys && sys[tile_sel.value]) {
+        sys[tile_sel.value].draw(ctx);
+    }
+    
+    ctx.restore();
 
-	pop();
-
-	if( uibox ) {
-		stroke( 0 );
-		strokeWeight( 0.5 );
-		fill( 255, 220 );
-		rect( 5, 5, 135, 335 );
-	}
-	noLoop();
+    // UI Box
+    if(uibox) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 0.5;
+        ctx.fillRect(5, 5, 135, 275); // Adjusted height for fewer buttons
+        ctx.strokeRect(5, 5, 135, 275);
+    }
 }
-
-function windowResized() 
-{
-	resizeCanvas( windowWidth, windowHeight );
-}
-
-function mousePressed()
-{
-	dragging = true;
-	loop();
-}
-
-function mouseDragged()
-{
-	// Prevent interference with touch logic if P5 mixes them
-	if (touches.length > 1) return false;
-
-	if( dragging ) {
-		to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), 
-			to_screen );
-		loop();
-		return false;
-	} 
-}
-
-function mouseReleased()
-{
-	dragging = false;
-	loop();
-}
-
-function mouseWheel(event) {
-	// Determine scale factor
-	let s = event.delta > 0 ? 0.9 : 1.1;
-	
-	// Zoom centered on viewport center (0,0 in centered screen space)
-	to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
-	
-	lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
-	loop();
-	
-	// Prevent default browser scroll
-	return false;
-}
-
-function touchStarted() {
-	if (touches.length === 2) {
-		initialPinchDist = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
-	}
-	dragging = true;
-}
-
-function touchMoved() {
-	if (touches.length === 1) {
-		// Single touch pan
-		to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), to_screen );
-	} else if (touches.length === 2) {
-		// Two finger pinch zoom relative to viewport center
-		let d = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
-		
-		if (initialPinchDist > 0 && d > 0) {
-			let s = d / initialPinchDist;
-			to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
-			lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
-			initialPinchDist = d;
-		}
-	}
-	loop();
-	return false;
-}
-
-function touchEnded() {
-	// Reset dragging if no touches left
-	if (touches.length === 0) {
-		dragging = false;
-	}
-	// Reset pinch distance if not 2 fingers
-	if (touches.length !== 2) {
-		initialPinchDist = -1;
-	}
-}
-
