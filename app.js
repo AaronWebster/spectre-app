@@ -102,7 +102,6 @@ let generationLevel = 0;
 // UI Elements
 let tileSelector;
 let shapeSelector;
-let colorSchemeSelector;
 let numberCheckbox;
 let tileCountDisplay;
 
@@ -116,8 +115,8 @@ let tilesDrawnCount = 0;
 let previousTouchDistance = -1;
 let previousTouchCenter = null;
 
-// Current color map
-let currentColorMap = COLOR_SCHEMES.pride;
+// Current color map (locked to white)
+let currentColorMap = COLOR_SCHEMES.white;
 
 // =============================================================================
 // GEOMETRIC UTILITIES
@@ -934,36 +933,15 @@ function createUIElements() {
     tileSelector.value('Delta');
     tileSelector.changed(loop);
 
-    // Color scheme selector
-    label = createSpan('Colours');
-    label.position(10, 160);
-    label.size(125, 15);
-
-    colorSchemeSelector = createSelect();
-    colorSchemeSelector.position(10, 180);
-    colorSchemeSelector.size(125, 25);
-    colorSchemeSelector.option('Pride');
-    colorSchemeSelector.option('Mystics');
-    colorSchemeSelector.option('Figure 5.3');
-    colorSchemeSelector.option('Bright');
-    colorSchemeSelector.option('White');
-    colorSchemeSelector.changed(loop);
-
-    // Save PNG button
-    const savePngButton = createButton("Save PNG");
-    savePngButton.position(10, 220);
-    savePngButton.size(125, 25);
-    savePngButton.mousePressed(handleSavePNG);
-
     // Save SVG button
     const saveSvgButton = createButton("Save SVG");
-    saveSvgButton.position(10, 250);
+    saveSvgButton.position(10, 170);
     saveSvgButton.size(125, 25);
     saveSvgButton.mousePressed(handleSaveSVG);
 
     // Number tiles checkbox
     numberCheckbox = createCheckbox('Number Tiles', false);
-    numberCheckbox.position(10, 290);
+    numberCheckbox.position(10, 210);
     numberCheckbox.changed(loop);
 }
 
@@ -989,17 +967,6 @@ function handleShapeChange() {
     lineWeightScale = 1;
     generationLevel = 0;
     loop();
-}
-
-/**
- * Handles PNG save button press
- */
-function handleSavePNG() {
-    showUIBox = false;
-    draw();
-    save("output.png");
-    showUIBox = true;
-    draw();
 }
 
 /**
@@ -1057,7 +1024,7 @@ function draw() {
         stroke(0);
         strokeWeight(0.5);
         fill(255, 220);
-        rect(5, 5, 135, 335);
+        rect(5, 5, 135, 255);
     }
     
     noLoop();
@@ -1065,6 +1032,7 @@ function draw() {
 
 /**
  * Automatically expands the tile system if needed
+ * Ensures dense tiling by expanding until tiles fully cover viewport
  */
 function autoExpandTiles() {
     const inverseTransform = invertMatrix(toScreenTransform);
@@ -1086,6 +1054,10 @@ function autoExpandTiles() {
         }
     }
     
+    // Add buffer for dense tiling: expand beyond viewport to ensure full coverage
+    // Multiply by 1.5 to ensure tiles always fill the viewport with margin
+    maxDistance *= 1.5;
+    
     // Expand if necessary
     let currentTile = tileSystem[tileSelector.value()];
     let loopGuard = 0;
@@ -1101,22 +1073,10 @@ function autoExpandTiles() {
 }
 
 /**
- * Updates the current color scheme based on selector
+ * Updates the current color scheme (locked to white)
  */
 function updateColorScheme() {
-    const scheme = colorSchemeSelector.value();
-    
-    if (scheme === 'Figure 5.3') {
-        currentColorMap = COLOR_SCHEMES.figure53;
-    } else if (scheme === 'Bright') {
-        currentColorMap = COLOR_SCHEMES.original;
-    } else if (scheme === 'Pride') {
-        currentColorMap = COLOR_SCHEMES.pride;
-    } else if (scheme === 'White') {
-        currentColorMap = COLOR_SCHEMES.white;
-    } else {
-        currentColorMap = COLOR_SCHEMES.mystics;
-    }
+    currentColorMap = COLOR_SCHEMES.white;
 }
 
 /**
@@ -1151,7 +1111,7 @@ function mouseWheel(event) {
  */
 function mousePressed() {
     // Ignore if clicking on UI
-    if (mouseX < 150 && mouseY < 350) {
+    if (mouseX < 150 && mouseY < 270) {
         return;
     }
     isDragging = true;
@@ -1185,7 +1145,7 @@ function mouseReleased() {
  */
 function touchStarted() {
     // Ignore if touching UI
-    if (mouseX < 150 && mouseY < 350) {
+    if (mouseX < 150 && mouseY < 270) {
         return;
     }
     
@@ -1204,7 +1164,7 @@ function touchStarted() {
  */
 function touchMoved() {
     // Ignore if touching UI
-    if (mouseX < 150 && mouseY < 350) {
+    if (mouseX < 150 && mouseY < 270) {
         return;
     }
     

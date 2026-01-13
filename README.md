@@ -6,9 +6,10 @@ Interactive JavaScript application for exploring the Spectre tile from "A Chiral
 
 - Interactive visualization of the Spectre tile and related aperiodic tilings
 - Multiple tile types: Spectre, Hat/Turtle, and Hexagons
-- Various color schemes including Pride, Mystics, and Figure 5.3
+- Dense tiling: viewport is always fully populated with tiles (no whitespace)
+- Efficient rendering with viewport culling for optimal performance
 - Zoom and pan controls (mouse wheel and drag, or pinch-to-zoom on touch devices)
-- Export to PNG and SVG formats
+- Export to SVG format
 - Tile numbering option
 
 ## Usage
@@ -20,7 +21,7 @@ Open `index.html` in a web browser. The application requires an internet connect
 - **Mouse Wheel**: Zoom in/out
 - **Click and Drag**: Pan the view
 - **Touch Devices**: Pinch to zoom, drag to pan
-- **UI Controls**: Use the left sidebar to change shapes, colors, and other settings
+- **UI Controls**: Use the left sidebar to change shapes and export settings
 
 ## File Structure
 
