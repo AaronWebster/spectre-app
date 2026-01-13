@@ -15,6 +15,19 @@
 const IDENTITY_MATRIX = [1, 0, 0, 0, 1, 0];
 const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
 
+// Dense tiling buffer: ensures complete tile coverage during zoom/pan/resize while
+// minimizing performance impact by limiting excessive generation to 50% beyond viewport
+const DENSE_TILING_BUFFER = 1.5;
+
+// UI layout constants
+const UI_BOX_X = 5;
+const UI_BOX_Y = 5;
+const UI_BOX_WIDTH = 135;
+const UI_BOX_HEIGHT = 235; // Accommodates all UI elements (checkbox at y=210 + ~25px height)
+const UI_PADDING = 15; // Extra padding for interaction area beyond visible box
+const UI_INTERACTION_WIDTH = UI_BOX_WIDTH + UI_PADDING;
+const UI_INTERACTION_HEIGHT = UI_BOX_HEIGHT + UI_PADDING;
+
 const TILE_NAMES = [
     'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
     'Pi', 'Sigma', 'Phi', 'Psi'
@@ -102,7 +115,6 @@ let generationLevel = 0;
 // UI Elements
 let tileSelector;
 let shapeSelector;
-let colorSchemeSelector;
 let numberCheckbox;
 let tileCountDisplay;
 
@@ -116,8 +128,8 @@ let tilesDrawnCount = 0;
 let previousTouchDistance = -1;
 let previousTouchCenter = null;
 
-// Current color map
-let currentColorMap = COLOR_SCHEMES.pride;
+// Current color map (locked to white)
+let currentColorMap = COLOR_SCHEMES.white;
 
 // =============================================================================
 // GEOMETRIC UTILITIES
@@ -934,36 +946,15 @@ function createUIElements() {
     tileSelector.value('Delta');
     tileSelector.changed(loop);
 
-    // Color scheme selector
-    label = createSpan('Colours');
-    label.position(10, 160);
-    label.size(125, 15);
-
-    colorSchemeSelector = createSelect();
-    colorSchemeSelector.position(10, 180);
-    colorSchemeSelector.size(125, 25);
-    colorSchemeSelector.option('Pride');
-    colorSchemeSelector.option('Mystics');
-    colorSchemeSelector.option('Figure 5.3');
-    colorSchemeSelector.option('Bright');
-    colorSchemeSelector.option('White');
-    colorSchemeSelector.changed(loop);
-
-    // Save PNG button
-    const savePngButton = createButton("Save PNG");
-    savePngButton.position(10, 220);
-    savePngButton.size(125, 25);
-    savePngButton.mousePressed(handleSavePNG);
-
     // Save SVG button
     const saveSvgButton = createButton("Save SVG");
-    saveSvgButton.position(10, 250);
+    saveSvgButton.position(10, 170);
     saveSvgButton.size(125, 25);
     saveSvgButton.mousePressed(handleSaveSVG);
 
     // Number tiles checkbox
     numberCheckbox = createCheckbox('Number Tiles', false);
-    numberCheckbox.position(10, 290);
+    numberCheckbox.position(10, 210);
     numberCheckbox.changed(loop);
 }
 
@@ -989,17 +980,6 @@ function handleShapeChange() {
     lineWeightScale = 1;
     generationLevel = 0;
     loop();
-}
-
-/**
- * Handles PNG save button press
- */
-function handleSavePNG() {
-    showUIBox = false;
-    draw();
-    save("output.png");
-    showUIBox = true;
-    draw();
 }
 
 /**
@@ -1037,8 +1017,8 @@ function draw() {
         toScreenTransform[2], toScreenTransform[5]
     );
 
-    // Update color scheme
-    updateColorScheme();
+    // Use white color scheme for all tiles
+    currentColorMap = COLOR_SCHEMES.white;
 
     // Draw tiles
     drawCounter = 1;
@@ -1057,7 +1037,7 @@ function draw() {
         stroke(0);
         strokeWeight(0.5);
         fill(255, 220);
-        rect(5, 5, 135, 335);
+        rect(UI_BOX_X, UI_BOX_Y, UI_BOX_WIDTH, UI_BOX_HEIGHT);
     }
     
     noLoop();
@@ -1065,6 +1045,7 @@ function draw() {
 
 /**
  * Automatically expands the tile system if needed
+ * Ensures dense tiling by expanding until tiles fully cover viewport
  */
 function autoExpandTiles() {
     const inverseTransform = invertMatrix(toScreenTransform);
@@ -1086,6 +1067,11 @@ function autoExpandTiles() {
         }
     }
     
+    // Add buffer for dense tiling: expand beyond viewport to ensure full coverage
+    // The DENSE_TILING_BUFFER value (1.5x) balances performance (avoiding excessive
+    // tile generation) with coverage (ensuring no whitespace appears during zoom/pan/resize)
+    maxDistance *= DENSE_TILING_BUFFER;
+    
     // Expand if necessary
     let currentTile = tileSystem[tileSelector.value()];
     let loopGuard = 0;
@@ -1097,25 +1083,6 @@ function autoExpandTiles() {
         generationLevel++;
         currentTile = tileSystem[tileSelector.value()];
         loopGuard++;
-    }
-}
-
-/**
- * Updates the current color scheme based on selector
- */
-function updateColorScheme() {
-    const scheme = colorSchemeSelector.value();
-    
-    if (scheme === 'Figure 5.3') {
-        currentColorMap = COLOR_SCHEMES.figure53;
-    } else if (scheme === 'Bright') {
-        currentColorMap = COLOR_SCHEMES.original;
-    } else if (scheme === 'Pride') {
-        currentColorMap = COLOR_SCHEMES.pride;
-    } else if (scheme === 'White') {
-        currentColorMap = COLOR_SCHEMES.white;
-    } else {
-        currentColorMap = COLOR_SCHEMES.mystics;
     }
 }
 
@@ -1151,7 +1118,7 @@ function mouseWheel(event) {
  */
 function mousePressed() {
     // Ignore if clicking on UI
-    if (mouseX < 150 && mouseY < 350) {
+    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
         return;
     }
     isDragging = true;
@@ -1185,7 +1152,7 @@ function mouseReleased() {
  */
 function touchStarted() {
     // Ignore if touching UI
-    if (mouseX < 150 && mouseY < 350) {
+    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
         return;
     }
     
@@ -1204,7 +1171,7 @@ function touchStarted() {
  */
 function touchMoved() {
     // Ignore if touching UI
-    if (mouseX < 150 && mouseY < 350) {
+    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
         return;
     }
     
