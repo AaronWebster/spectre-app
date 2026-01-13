@@ -464,7 +464,7 @@ function createUI() {
     shape_sel = addSelect(10, 30, [
         'Tile(1,1)', 'Spectres', 'Hexagons', 
         'Turtles in Hats', 'Hats in Turtles'
-    ], 'Spectres'); // Default
+    ], 'Tile(1,1)'); // Default
     
     shape_sel.addEventListener('change', () => {
 		const s = shape_sel.value;
@@ -596,7 +596,7 @@ function init() {
     createUI();
 
     // Init Logic - Default to Spectres
-    sys = buildSpectreBase(true); // Default to Spectres based on UI default
+    sys = buildSpectreBase(false); // Default to Tile(1,1) based on UI default
     // Wait, createUI sets Spectres default, but change listener not fired.
     // Let's match default manually.
     // UI default 'Spectres' -> buildSpectreBase(true)
