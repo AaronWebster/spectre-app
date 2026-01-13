@@ -1,1330 +1,747 @@
-/**
- * Spectre Tile Interactive Visualization
- * 
- * An interactive app for exploring the Spectre tile, based on the paper
- * "A Chiral Aperiodic Monotile" by David Smith, Joseph Samuel Myers,
- * Craig S. Kaplan, and Chaim Goodman-Strauss.
- * 
- * This application uses p5.js for rendering and interaction.
- */
+const ident = [1,0,0,0,1,0];
 
-// =============================================================================
-// CONSTANTS AND CONFIGURATION
-// =============================================================================
+let to_screen = [20, 0, 0, 0, -20, 0];
+let lw_scale = 1;
 
-const IDENTITY_MATRIX = [1, 0, 0, 0, 1, 0];
-const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
+let sys;
 
-// Dense tiling buffer: ensures complete tile coverage during zoom/pan/resize.
-// With the grid-based dense tiling approach, a smaller buffer is sufficient
-// since multiple tile copies are placed to cover the viewport.
-const DENSE_TILING_BUFFER = 1.5;
+let scale_centre;
+let scale_start;
+let scale_ts;
 
-// UI layout constants
-const UI_BOX_X = 5;
-const UI_BOX_Y = 5;
-const UI_BOX_WIDTH = 135;
-const UI_BOX_HEIGHT = 235; // Accommodates all UI elements (checkbox at y=210 + ~25px height)
-const UI_PADDING = 15; // Extra padding for interaction area beyond visible box
-const UI_INTERACTION_WIDTH = UI_BOX_WIDTH + UI_PADDING;
-const UI_INTERACTION_HEIGHT = UI_BOX_HEIGHT + UI_PADDING;
+let reset_but;
+let tile_sel;
+let shape_sel;
+let colscheme_sel;
 
-const TILE_NAMES = [
-    'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
-    'Pi', 'Sigma', 'Phi', 'Psi'
-];
+let subst_button;
+let translate_button;
+let scale_button;
+let dragging = false;
+let uibox = true;
 
-// Color schemes from various sources
-const COLOR_SCHEMES = {
-    // Color map from Figure 5.3
-    figure53: {
-        'Gamma': [203, 157, 126],
-        'Gamma1': [203, 157, 126],
-        'Gamma2': [203, 157, 126],
-        'Delta': [163, 150, 133],
-        'Theta': [208, 215, 150],
-        'Lambda': [184, 205, 178],
-        'Xi': [211, 177, 144],
-        'Pi': [218, 197, 161],
-        'Sigma': [191, 146, 126],
-        'Phi': [228, 213, 167],
-        'Psi': [224, 223, 156]
-    },
-    original: {
-        'Gamma': [255, 255, 255],
-        'Gamma1': [255, 255, 255],
-        'Gamma2': [255, 255, 255],
-        'Delta': [220, 220, 220],
-        'Theta': [255, 191, 191],
-        'Lambda': [255, 160, 122],
-        'Xi': [255, 242, 0],
-        'Pi': [135, 206, 250],
-        'Sigma': [245, 245, 220],
-        'Phi': [0, 255, 0],
-        'Psi': [0, 255, 255]
-    },
-    mystics: {
-        'Gamma': [196, 201, 169],
-        'Gamma1': [196, 201, 169],
-        'Gamma2': [156, 160, 116],
-        'Delta': [247, 252, 248],
-        'Theta': [247, 252, 248],
-        'Lambda': [247, 252, 248],
-        'Xi': [247, 252, 248],
-        'Pi': [247, 252, 248],
-        'Sigma': [247, 252, 248],
-        'Phi': [247, 252, 248],
-        'Psi': [247, 252, 248]
-    },
-    pride: {
-        'Gamma': [255, 255, 255],
-        'Gamma1': [97, 57, 21],
-        'Gamma2': [0, 0, 0],
-        'Delta': [2, 129, 33],
-        'Theta': [0, 76, 255],
-        'Lambda': [118, 0, 136],
-        'Xi': [229, 0, 0],
-        'Pi': [255, 175, 199],
-        'Sigma': [115, 215, 238],
-        'Phi': [255, 141, 0],
-        'Psi': [255, 238, 0]
-    },
-    white: {
-        'Gamma': [255, 255, 255],
-        'Gamma1': [255, 255, 255],
-        'Gamma2': [255, 255, 255],
-        'Delta': [255, 255, 255],
-        'Theta': [255, 255, 255],
-        'Lambda': [255, 255, 255],
-        'Xi': [255, 255, 255],
-        'Pi': [255, 255, 255],
-        'Sigma': [255, 255, 255],
-        'Phi': [255, 255, 255],
-        'Psi': [255, 255, 255]
-    }
+const tile_names = [ 
+	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
+	'Pi', 'Sigma', 'Phi', 'Psi' ];
+
+// Color map from Figure 5.3
+const colmap53 = {
+	'Gamma' : [203, 157, 126],
+	'Gamma1' : [203, 157, 126],
+	'Gamma2' : [203, 157, 126],
+	'Delta' : [163, 150, 133],
+	'Theta' : [208, 215, 150],
+	'Lambda' : [184, 205, 178],
+	'Xi' : [211, 177, 144],
+	'Pi' : [218, 197, 161],
+	'Sigma' : [191, 146, 126],
+	'Phi' : [228, 213, 167],
+	'Psi' : [224, 223, 156] };
+
+const colmap_orig = {
+	'Gamma' : [255, 255, 255],
+	'Gamma1' : [255, 255, 255],
+	'Gamma2' : [255, 255, 255],
+	'Delta' : [220, 220, 220],
+	'Theta' : [255, 191, 191],
+	'Lambda' : [255, 160, 122],
+	'Xi' : [255, 242, 0],
+	'Pi' : [135, 206, 250],
+	'Sigma' : [245, 245, 220],
+	'Phi' : [0, 255, 0],
+	'Psi' : [0, 255, 255] };
+
+const colmap_mystics = {
+	'Gamma' : [196, 201, 169],
+	'Gamma1' : [196, 201, 169],
+	'Gamma2' : [156, 160, 116],
+	'Delta' : [247, 252, 248],
+	'Theta' : [247, 252, 248],
+	'Lambda' : [247, 252, 248],
+	'Xi' : [247, 252, 248],
+	'Pi' : [247, 252, 248],
+	'Sigma' : [247, 252, 248],
+	'Phi' : [247, 252, 248],
+	'Psi' : [247, 252, 248] };
+
+const colmap_pride = {
+	'Gamma' : [255, 255, 255],
+	'Gamma1' : [97, 57, 21], 
+	'Gamma2' : [0, 0, 0],
+	'Delta' : [2, 129, 33],
+	'Theta' : [0, 76, 255],
+	'Lambda' : [118, 0, 136],
+	'Xi' : [229, 0, 0],
+	'Pi' : [255, 175, 199],
+	'Sigma' : [115, 215, 238],
+	'Phi' : [255, 141, 0],
+	'Psi' : [255, 238, 0] };
+
+let colmap = colmap_pride;
+
+function pt( x, y )
+{
+	return { x : x, y : y };
+}
+
+// Affine matrix inverse
+function inv( T ) {
+	const det = T[0]*T[4] - T[1]*T[3];
+	return [T[4]/det, -T[1]/det, (T[1]*T[5]-T[2]*T[4])/det,
+		-T[3]/det, T[0]/det, (T[2]*T[3]-T[0]*T[5])/det];
 };
 
-// =============================================================================
-// STATE VARIABLES
-// =============================================================================
+// Affine matrix multiply
+function mul( A, B )
+{
+	return [A[0]*B[0] + A[1]*B[3], 
+		A[0]*B[1] + A[1]*B[4],
+		A[0]*B[2] + A[1]*B[5] + A[2],
 
-let toScreenTransform = [20, 0, 0, 0, -20, 0];
-let lineWeightScale = 1;
-let tileSystem;
-let generationLevel = 0;
-
-// UI Elements
-let tileSelector;
-let shapeSelector;
-let numberCheckbox;
-let tileCountDisplay;
-
-// Interaction State
-let isDragging = false;
-let showUIBox = true;
-let drawCounter = 1;
-let tilesDrawnCount = 0;
-
-// Touch handling
-let previousTouchDistance = -1;
-let previousTouchCenter = null;
-
-// Current color map (locked to white)
-let currentColorMap = COLOR_SCHEMES.white;
-
-// =============================================================================
-// GEOMETRIC UTILITIES
-// =============================================================================
-
-/**
- * Creates a 2D point
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {Object} Point object with x and y properties
- */
-function createPoint(x, y) {
-    return { x, y };
+		A[3]*B[0] + A[4]*B[3], 
+		A[3]*B[1] + A[4]*B[4],
+		A[3]*B[2] + A[4]*B[5] + A[5]];
 }
 
-/**
- * Computes the inverse of an affine transformation matrix
- * @param {Array<number>} T - 6-element affine matrix [a, b, c, d, e, f]
- * @returns {Array<number>} Inverted matrix
- */
-function invertMatrix(T) {
-    const det = T[0] * T[4] - T[1] * T[3];
-    return [
-        T[4] / det,
-        -T[1] / det,
-        (T[1] * T[5] - T[2] * T[4]) / det,
-        -T[3] / det,
-        T[0] / det,
-        (T[2] * T[3] - T[0] * T[5]) / det
-    ];
+function padd( p, q )
+{
+	return { x : p.x + q.x, y : p.y + q.y };
 }
 
-/**
- * Multiplies two affine transformation matrices
- * @param {Array<number>} A - First matrix
- * @param {Array<number>} B - Second matrix
- * @returns {Array<number>} Product matrix
- */
-function multiplyMatrices(A, B) {
-    return [
-        A[0] * B[0] + A[1] * B[3],
-        A[0] * B[1] + A[1] * B[4],
-        A[0] * B[2] + A[1] * B[5] + A[2],
-        A[3] * B[0] + A[4] * B[3],
-        A[3] * B[1] + A[4] * B[4],
-        A[3] * B[2] + A[4] * B[5] + A[5]
-    ];
+function psub( p, q )
+{
+	return { x : p.x - q.x, y : p.y - q.y };
 }
 
-/**
- * Adds two points
- * @param {Object} p - First point
- * @param {Object} q - Second point
- * @returns {Object} Sum of points
- */
-function addPoints(p, q) {
-    return { x: p.x + q.x, y: p.y + q.y };
+function pframe( o, p, q, a, b )
+{
+	return { x : o.x + a*p.x + b*q.x, y : o.y + a*p.y + b*q.y };
 }
 
-/**
- * Subtracts two points
- * @param {Object} p - First point
- * @param {Object} q - Second point
- * @returns {Object} Difference of points
- */
-function subtractPoints(p, q) {
-    return { x: p.x - q.x, y: p.y - q.y };
+// Rotation matrix
+function trot( ang )
+{
+	const c = cos( ang );
+	const s = sin( ang );
+	return [c, -s, 0, s, c, 0];
 }
 
-/**
- * Computes a point in a coordinate frame
- * @param {Object} o - Origin
- * @param {Object} p - First basis vector
- * @param {Object} q - Second basis vector
- * @param {number} a - First coordinate
- * @param {number} b - Second coordinate
- * @returns {Object} Point in the frame
- */
-function pointInFrame(o, p, q, a, b) {
-    return {
-        x: o.x + a * p.x + b * q.x,
-        y: o.y + a * p.y + b * q.y
-    };
+// Translation matrix
+function ttrans( tx, ty )
+{
+	return [1, 0, tx, 0, 1, ty];
 }
 
-/**
- * Creates a rotation matrix
- * @param {number} angle - Rotation angle in radians
- * @returns {Array<number>} Rotation matrix
- */
-function rotationMatrix(angle) {
-    const c = cos(angle);
-    const s = sin(angle);
-    return [c, -s, 0, s, c, 0];
+function transTo( p, q )
+{
+	return ttrans( q.x - p.x, q.y - p.y );
 }
 
-/**
- * Creates a translation matrix
- * @param {number} tx - Translation in x
- * @param {number} ty - Translation in y
- * @returns {Array<number>} Translation matrix
- */
-function translationMatrix(tx, ty) {
-    return [1, 0, tx, 0, 1, ty];
+function rotAbout( p, ang )
+{
+	return mul( ttrans( p.x, p.y ), 
+		mul( trot( ang ), ttrans( -p.x, -p.y ) ) );
 }
 
-/**
- * Creates a translation matrix from point p to point q
- * @param {Object} p - Starting point
- * @param {Object} q - Ending point
- * @returns {Array<number>} Translation matrix
- */
-function translateTo(p, q) {
-    return translationMatrix(q.x - p.x, q.y - p.y);
+// Matrix * point
+function transPt( M, P )
+{
+	return pt(M[0]*P.x + M[1]*P.y + M[2], M[3]*P.x + M[4]*P.y + M[5]);
 }
 
-/**
- * Creates a rotation matrix about a point
- * @param {Object} p - Center of rotation
- * @param {number} angle - Rotation angle
- * @returns {Array<number>} Rotation matrix about the point
- */
-function rotateAbout(p, angle) {
-    return multiplyMatrices(
-        translationMatrix(p.x, p.y),
-        multiplyMatrices(rotationMatrix(angle), translationMatrix(-p.x, -p.y))
-    );
+// Match unit interval to line segment p->q
+function matchSeg( p, q )
+{
+	return [q.x-p.x, p.y-q.y, p.x,  q.y-p.y, q.x-p.x, p.y];
+};
+
+// Match line segment p1->q1 to line segment p2->q2
+function matchTwo( p1, q1, p2, q2 )
+{
+	return mul( matchSeg( p2, q2 ), inv( matchSeg( p1, q1 ) ) );
+};
+
+function drawPolygon( shape, T, f, s, w )
+{
+	if( f != null ) {
+		fill( ...f );
+	} else {
+		noFill();
+	}
+	if( s != null ) {
+		stroke( 0 );
+		strokeWeight( w ) ; // / lw_scale );
+	} else {
+		noStroke();
+	}
+	beginShape();
+	for( let p of shape ) {
+		const tp = transPt( T, p );
+		vertex( tp.x, tp.y );
+	}
+	endShape( CLOSE );
 }
 
-/**
- * Transforms a point by a matrix
- * @param {Array<number>} M - Transformation matrix
- * @param {Object} P - Point to transform
- * @returns {Object} Transformed point
- */
-function transformPoint(M, P) {
-    return createPoint(
-        M[0] * P.x + M[1] * P.y + M[2],
-        M[3] * P.x + M[4] * P.y + M[5]
-    );
+function streamPolygon( shape, T, f, s, w )
+{
+
 }
 
-/**
- * Checks if a bounding circle is visible on screen
- * @param {Array<number>} S - Object transformation matrix
- * @param {number} radius - Bounding radius
- * @returns {boolean} True if the object is on screen
- */
-function isOnScreen(S, radius) {
-    // Combine view transform and object transform
-    const M = multiplyMatrices(toScreenTransform, S);
-    
-    // Transform center to screen space (relative to center of canvas)
-    const centerRelative = transformPoint(M, { x: 0, y: 0 });
-    
-    // Actual screen coordinates (0,0 is top-left)
-    const centerX = centerRelative.x + width / 2;
-    const centerY = centerRelative.y + height / 2;
-    
-    // Scale the radius
-    const scale = Math.hypot(M[0], M[1]);
-    const screenRadius = radius * scale;
-    
-    // Check intersection with screen rectangle
-    const closestX = Math.max(0, Math.min(width, centerX));
-    const closestY = Math.max(0, Math.min(height, centerY));
-    
-    const dx = centerX - closestX;
-    const dy = centerY - closestY;
-    
-    return (dx * dx + dy * dy) < (screenRadius * screenRadius);
+class Shape
+{
+	constructor( pts, quad, label )
+	{
+		this.pts = pts;
+		this.quad = quad;
+		this.label = label;
+	}
+
+	draw( S )
+	{
+		drawPolygon( this.pts, S, colmap[this.label], [0,0,0], 0.1 );
+	}
+
+	streamSVG( S, stream )
+	{
+		var s = '<polygon points="';
+		var at_start = true;
+		for( let p of this.pts ) {
+			const sp = transPt( S, p );
+			if( at_start ) {
+				at_start = false;
+			} else {
+				s = s + ' ';
+			}
+			s = s + `${sp.x},${sp.y}`;
+		}
+		const col = colmap[this.label];
+
+		s = s + `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
+		stream.push( s );
+	}
 }
 
-/**
- * Draws a polygon with the given shape and transformation
- * @param {Array<Object>} shape - Array of points defining the polygon
- * @param {Array<number>} T - Transformation matrix
- * @param {Array<number>} fillColor - Fill color [r, g, b] or null
- * @param {Array<number>} strokeColor - Stroke color [r, g, b] or null
- * @param {number} weight - Stroke weight
- */
-function drawPolygon(shape, T, fillColor, strokeColor, weight) {
-    if (fillColor != null) {
-        fill(...fillColor);
-    } else {
-        noFill();
-    }
-    
-    if (strokeColor != null) {
-        stroke(0);
-        strokeWeight(weight);
-    } else {
-        noStroke();
-    }
-    
-    beginShape();
-    for (let p of shape) {
-        const tp = transformPoint(T, p);
-        vertex(tp.x, tp.y);
-    }
-    endShape(CLOSE);
+class CurvyShape
+{
+	constructor( pts, quad, label )
+	{
+		this.quad = quad;
+		this.label = label;
+
+		let blah = true;
+
+		this.pts = [pts[pts.length-1]];
+		for( const p of pts ) {
+			const prev = this.pts[this.pts.length-1];
+			const v = psub( p, prev );
+			const w = pt( -v.y, v.x );
+			if( blah ) {
+				this.pts.push( pframe( prev, v, w, 0.33, 0.6 ) );
+				this.pts.push( pframe( prev, v, w, 0.67, 0.6 ) );
+			} else {
+				this.pts.push( pframe( prev, v, w, 0.33, -0.6 ) );
+				this.pts.push( pframe( prev, v, w, 0.67, -0.6 ) );
+			}
+			blah = !blah;
+			this.pts.push( p );
+		}
+	}
+
+	draw( S )
+	{
+		fill( ...colmap[this.label] );
+		strokeWeight( 0.1 );
+		stroke( 0 );
+
+		beginShape();
+		const tp = transPt( S, this.pts[0] );
+		vertex( tp.x, tp.y );
+
+		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
+			const a = transPt( S, this.pts[idx] );
+			const b = transPt( S, this.pts[idx+1] );
+			const c = transPt( S, this.pts[idx+2] );
+
+			bezierVertex( a.x, a.y, b.x, b.y, c.x, c.y );
+		}
+		endShape( CLOSE );
+	}
+
+	streamSVG( S, stream )
+	{
+		const tp = transPt( S, this.pts[0] );
+		vertex( tp.x, tp.y );
+
+		var s = `<path d="M ${tp.x} ${tp.y}`;
+		
+		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
+			const a = transPt( S, this.pts[idx] );
+			const b = transPt( S, this.pts[idx+1] );
+			const c = transPt( S, this.pts[idx+2] );
+
+			s = s + ` C ${a.x} ${a.y} ${b.x} ${b.y} ${c.x} ${c.y}`;	
+		}
+		const col = colmap[this.label];
+
+		s = s + `" stroke="black" stroke-weight="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
+		stream.push( s );
+	}
 }
 
-// =============================================================================
-// SHAPE CLASSES
-// =============================================================================
+class Meta
+{
+	constructor()
+	{
+		this.geoms = [];
+		this.quad = [];
+	}
 
-/**
- * Basic polygonal shape class
- */
-class Shape {
-    /**
-     * @param {Array<Object>} points - Vertices of the shape
-     * @param {Array<Object>} quad - Quadrilateral key points
-     * @param {string} label - Label for coloring
-     */
-    constructor(points, quad, label) {
-        this.pts = points;
-        this.quad = quad;
-        this.label = label;
-        this.calculateRadius();
-    }
+	addChild( g, T )
+	{
+		this.geoms.push( { geom : g, xform: T } );
+	}
 
-    /**
-     * Calculates the bounding radius for culling
-     */
-    calculateRadius() {
-        this.radius = 0;
-        for (let p of this.pts) {
-            const d = Math.hypot(p.x, p.y);
-            if (d > this.radius) {
-                this.radius = d;
-            }
-        }
-    }
+	draw( S ) 
+	{
+		for( let g of this.geoms ) {
+			g.geom.draw( mul( S, g.xform ) );
+		}
+	}
 
-    /**
-     * Draws the shape with the given transformation
-     * @param {Array<number>} S - Transformation matrix
-     */
-    draw(S) {
-        // Cull check - skip if not on screen
-        if (!isOnScreen(S, this.radius)) {
-            return;
-        }
-
-        drawPolygon(this.pts, S, currentColorMap[this.label], [0, 0, 0], 0.1);
-        tilesDrawnCount++;
-
-        // Draw tile numbers if enabled
-        if (numberCheckbox && numberCheckbox.checked()) {
-            this.drawTileNumber(S);
-        }
-    }
-
-    /**
-     * Draws the tile number at the center of the shape
-     * @param {Array<number>} S - Transformation matrix
-     */
-    drawTileNumber(S) {
-        let cx = 0, cy = 0;
-        let count = 0;
-        
-        for (let p of this.pts) {
-            const tp = transformPoint(S, p);
-            cx += tp.x;
-            cy += tp.y;
-            count++;
-        }
-        
-        cx /= count;
-        cy /= count;
-
-        fill(0);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(0.5);
-        push();
-        translate(cx, cy);
-        scale(1, -1);
-        text(drawCounter, 0, 0);
-        pop();
-        drawCounter++;
-    }
-
-    /**
-     * Exports the shape to SVG format
-     * @param {Array<number>} S - Transformation matrix
-     * @param {Array<string>} stream - Output stream for SVG strings
-     */
-    streamSVG(S, stream) {
-        let svgString = '<polygon points="';
-        let isFirst = true;
-        
-        let cx = 0, cy = 0;
-        let count = 0;
-
-        for (let p of this.pts) {
-            const sp = transformPoint(S, p);
-            cx += sp.x;
-            cy += sp.y;
-            count++;
-
-            if (!isFirst) {
-                svgString += ' ';
-            }
-            svgString += `${sp.x},${sp.y}`;
-            isFirst = false;
-        }
-        
-        const col = currentColorMap[this.label];
-        svgString += `" stroke="black" stroke-width="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
-        stream.push(svgString);
-
-        if (numberCheckbox && numberCheckbox.checked()) {
-            cx /= count;
-            cy /= count;
-            stream.push(`<text x="${cx}" y="${cy}" font-family="Arial" font-size="12" text-anchor="middle" fill="black">${drawCounter}</text>`);
-            drawCounter++;
-        }
-    }
+	streamSVG( S, stream )
+	{
+		for( let g of this.geoms ) {
+			g.geom.streamSVG( mul( S, g.xform ), stream );
+		}
+	}
 }
 
-/**
- * Shape class with curved edges using Bezier curves
- */
-class CurvyShape {
-    /**
-     * @param {Array<Object>} points - Vertices of the shape
-     * @param {Array<Object>} quad - Quadrilateral key points
-     * @param {string} label - Label for coloring
-     */
-    constructor(points, quad, label) {
-        this.quad = quad;
-        this.label = label;
+function buildSpectreBase( curved )
+{
+	const spectre = [
+		pt(0, 0),
+		pt(1.0, 0.0),
+		pt(1.5, -0.8660254037844386),
+		pt(2.366025403784439, -0.36602540378443865),
+		pt(2.366025403784439, 0.6339745962155614),
+		pt(3.366025403784439, 0.6339745962155614),
+		pt(3.866025403784439, 1.5),
+		pt(3.0, 2.0),
+		pt(2.133974596215561, 1.5),
+		pt(1.6339745962155614, 2.3660254037844393),
+		pt(0.6339745962155614, 2.3660254037844393),
+		pt(-0.3660254037844386, 2.3660254037844393),
+		pt(-0.866025403784439, 1.5),
+		pt(0.0, 1.0) 
+	];
 
-        // Generate curved control points
-        let alternateDirection = true;
-        this.pts = [points[points.length - 1]];
-        
-        for (const p of points) {
-            const prev = this.pts[this.pts.length - 1];
-            const v = subtractPoints(p, prev);
-            const w = createPoint(-v.y, v.x);
-            
-            const offset = alternateDirection ? 0.6 : -0.6;
-            this.pts.push(pointInFrame(prev, v, w, 0.33, offset));
-            this.pts.push(pointInFrame(prev, v, w, 0.67, offset));
-            alternateDirection = !alternateDirection;
-            this.pts.push(p);
-        }
-        
-        this.calculateRadius();
-    }
+	const spectre_keys = [
+		spectre[3], spectre[5], spectre[7], spectre[11]
+	];
 
-    /**
-     * Calculates the bounding radius for culling
-     */
-    calculateRadius() {
-        this.radius = 0;
-        for (let p of this.pts) {
-            const d = Math.hypot(p.x, p.y);
-            if (d > this.radius) {
-                this.radius = d;
-            }
-        }
-    }
+	const ret = {};
 
-    /**
-     * Draws the curved shape with the given transformation
-     * @param {Array<number>} S - Transformation matrix
-     */
-    draw(S) {
-        // Cull check
-        if (!isOnScreen(S, this.radius)) {
-            return;
-        }
+	for( lab of ['Delta', 'Theta', 'Lambda', 'Xi', 
+				 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+		if( curved ) {
+			ret[lab] = new CurvyShape( spectre, spectre_keys, lab );
+		} else {
+			ret[lab] = new Shape( spectre, spectre_keys, lab );
+		}
+	}
 
-        fill(...currentColorMap[this.label]);
-        strokeWeight(0.1);
-        stroke(0);
+	const mystic = new Meta();
+	if( curved ) {
+		mystic.addChild( 
+			new CurvyShape( spectre, spectre_keys, 'Gamma1' ), ident );
+		mystic.addChild( 
+			new CurvyShape( spectre, spectre_keys, 'Gamma2' ),
+				mul( ttrans( spectre[8].x, spectre[8].y ), trot( PI / 6 ) ) );
+	} else {
+		mystic.addChild( new Shape( spectre, spectre_keys, 'Gamma1' ), ident );
+		mystic.addChild( new Shape( spectre, spectre_keys, 'Gamma2' ),
+			mul( ttrans( spectre[8].x, spectre[8].y ), trot( PI / 6 ) ) );
+	}
+	mystic.quad = spectre_keys;
+	ret['Gamma'] = mystic;
 
-        beginShape();
-        const tp = transformPoint(S, this.pts[0]);
-        vertex(tp.x, tp.y);
-
-        for (let idx = 1; idx < this.pts.length; idx += 3) {
-            const a = transformPoint(S, this.pts[idx]);
-            const b = transformPoint(S, this.pts[idx + 1]);
-            const c = transformPoint(S, this.pts[idx + 2]);
-            bezierVertex(a.x, a.y, b.x, b.y, c.x, c.y);
-        }
-        
-        endShape(CLOSE);
-        tilesDrawnCount++;
-
-        // Draw tile numbers if enabled
-        if (numberCheckbox && numberCheckbox.checked()) {
-            this.drawTileNumber(S);
-        }
-    }
-
-    /**
-     * Draws the tile number at the center of the shape
-     * @param {Array<number>} S - Transformation matrix
-     */
-    drawTileNumber(S) {
-        let cx = 0, cy = 0;
-        let count = 0;
-        
-        for (let p of this.pts) {
-            const tp = transformPoint(S, p);
-            cx += tp.x;
-            cy += tp.y;
-            count++;
-        }
-        
-        cx /= count;
-        cy /= count;
-
-        fill(0);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(0.5);
-        push();
-        translate(cx, cy);
-        scale(1, -1);
-        text(drawCounter, 0, 0);
-        pop();
-        drawCounter++;
-    }
-
-    /**
-     * Exports the curved shape to SVG format
-     * @param {Array<number>} S - Transformation matrix
-     * @param {Array<string>} stream - Output stream for SVG strings
-     */
-    streamSVG(S, stream) {
-        const tp = transformPoint(S, this.pts[0]);
-        let cx = tp.x, cy = tp.y;
-        let count = 1;
-
-        let svgString = `<path d="M ${tp.x} ${tp.y}`;
-
-        for (let idx = 1; idx < this.pts.length; idx += 3) {
-            const a = transformPoint(S, this.pts[idx]);
-            const b = transformPoint(S, this.pts[idx + 1]);
-            const c = transformPoint(S, this.pts[idx + 2]);
-
-            cx += a.x + b.x + c.x;
-            cy += a.y + b.y + c.y;
-            count += 3;
-
-            svgString += ` C ${a.x} ${a.y} ${b.x} ${b.y} ${c.x} ${c.y}`;
-        }
-        
-        const col = currentColorMap[this.label];
-        svgString += `" stroke="black" stroke-width="0.1" fill="rgb(${col[0]},${col[1]},${col[2]})" />`;
-        stream.push(svgString);
-
-        if (numberCheckbox && numberCheckbox.checked()) {
-            cx /= count;
-            cy /= count;
-            stream.push(`<text x="${cx}" y="${cy}" font-family="Arial" font-size="12" text-anchor="middle" fill="black">${drawCounter}</text>`);
-            drawCounter++;
-        }
-    }
+	return ret;
 }
 
-/**
- * Meta-tile composed of multiple sub-tiles
- */
-class MetaTile {
-    constructor() {
-        this.geoms = [];
-        this.quad = [];
-        this.radius = 0;
-    }
+function buildHatTurtleBase( hat_dominant )
+{
+	const r3 = 1.7320508075688772;
+	const hr3 = 0.8660254037844386;
 
-    /**
-     * Adds a child geometry with a transformation
-     * @param {Object} geometry - Shape or MetaTile to add
-     * @param {Array<number>} transform - Transformation matrix
-     */
-    addChild(geometry, transform) {
-        this.geoms.push({ geom: geometry, xform: transform });
-    }
-    
-    /**
-     * Calculates the bounding radius for culling
-     */
-    calculateRadius() {
-        this.radius = 0;
-        for (let g of this.geoms) {
-            const p = transformPoint(g.xform, { x: 0, y: 0 });
-            const d = Math.hypot(p.x, p.y);
-            const r = d + g.geom.radius;
-            if (r > this.radius) {
-                this.radius = r;
-            }
-        }
-    }
+	function hexPt( x, y )
+	{
+		return pt( x + 0.5*y, -hr3*y );
+	}
 
-    /**
-     * Draws all child geometries
-     * @param {Array<number>} S - Transformation matrix
-     */
-    draw(S) {
-        // Cull check
-        if (!isOnScreen(S, this.radius)) {
-            return;
-        }
+	function hexPt2( x, y )
+	{
+		return pt( x + hr3*y, -0.5*y );
+	}
 
-        for (let g of this.geoms) {
-            g.geom.draw(multiplyMatrices(S, g.xform));
-        }
-    }
+	const hat = [
+		hexPt(-1, 2), hexPt(0, 2), hexPt(0, 3), hexPt(2, 2), hexPt(3, 0),
+		hexPt(4, 0), hexPt(5,-1), hexPt(4,-2), hexPt(2,-1), hexPt(2,-2),
+		hexPt( 1, -2), hexPt(0,-2), hexPt(-1,-1), hexPt(0, 0) ];
 
-    /**
-     * Exports the meta-tile to SVG format
-     * @param {Array<number>} S - Transformation matrix
-     * @param {Array<string>} stream - Output stream for SVG strings
-     */
-    streamSVG(S, stream) {
-        for (let g of this.geoms) {
-            g.geom.streamSVG(multiplyMatrices(S, g.xform), stream);
-        }
-    }
+	const turtle = [
+		hexPt(0,0), hexPt(2,-1), hexPt(3,0), hexPt(4,-1), hexPt(4,-2),
+		hexPt(6,-3), hexPt(7,-5), hexPt(6,-5), hexPt(5,-4), hexPt(4,-5),
+		hexPt(2,-4), hexPt(0,-3), hexPt(-1,-1), hexPt(0,-1)
+		];
+
+	const hat_keys = [
+		hat[3], hat[5], hat[7], hat[11]
+	];
+	const turtle_keys = [
+		turtle[3], turtle[5], turtle[7], turtle[11]
+	];
+
+	const ret = {};
+
+	if( hat_dominant ) {
+		for( lab of ['Delta', 'Theta', 'Lambda', 'Xi', 
+					 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+			ret[lab] = new Shape( hat, hat_keys, lab );
+		}
+
+		const mystic = new Meta();
+		mystic.addChild( new Shape( hat, hat_keys, 'Gamma1' ), ident );
+		mystic.addChild( new Shape( turtle, turtle_keys, 'Gamma2' ),
+			ttrans( hat[8].x, hat[8].y ) );
+		mystic.quad = hat_keys;
+		ret['Gamma'] = mystic;
+	} else {
+		for( lab of ['Delta', 'Theta', 'Lambda', 'Xi', 
+					 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+			ret[lab] = new Shape( turtle, turtle_keys, lab );
+		}
+
+		const mystic = new Meta();
+		mystic.addChild( new Shape( turtle, turtle_keys, 'Gamma1' ), ident );
+		mystic.addChild( new Shape( hat, hat_keys, 'Gamma2' ),
+			mul( ttrans( turtle[9].x, turtle[9].y ), trot( PI/3 ) ) );
+		mystic.quad = turtle_keys;
+		ret['Gamma'] = mystic;
+	}
+
+	return ret;
 }
 
-// =============================================================================
-// TILE CONSTRUCTION FUNCTIONS
-// =============================================================================
+function buildHexBase()
+{
+	const hr3 = 0.8660254037844386;
 
-/**
- * Builds the base Spectre tile system
- * @param {boolean} curved - Whether to use curved edges
- * @returns {Object} Dictionary of tile shapes
- */
-function buildSpectreBase(curved = false) {
-    const spectre = [
-        createPoint(0, 0),
-        createPoint(1.0, 0.0),
-        createPoint(1.5, -0.8660254037844386),
-        createPoint(2.366025403784439, -0.36602540378443865),
-        createPoint(2.366025403784439, 0.6339745962155614),
-        createPoint(3.366025403784439, 0.6339745962155614),
-        createPoint(3.866025403784439, 1.5),
-        createPoint(3.0, 2.0),
-        createPoint(2.133974596215561, 1.5),
-        createPoint(1.6339745962155614, 2.3660254037844393),
-        createPoint(0.6339745962155614, 2.3660254037844393),
-        createPoint(-0.3660254037844386, 2.3660254037844393),
-        createPoint(-0.866025403784439, 1.5),
-        createPoint(0.0, 1.0)
-    ];
+	const hex = [
+		pt(0, 0),
+		pt(1.0, 0.0),
+		pt(1.5, hr3),
+		pt(1, 2*hr3),
+		pt(0, 2*hr3),
+		pt(-0.5, hr3) 
+	];
 
-    const spectreKeys = [
-        spectre[3], spectre[5], spectre[7], spectre[11]
-    ];
+	const hex_keys = [ hex[1], hex[2], hex[3], hex[5] ];
 
-    const tiles = {};
-    const ShapeClass = curved ? CurvyShape : Shape;
+	const ret = {};
 
-    // Create base tiles
-    for (let label of ['Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Phi', 'Psi']) {
-        tiles[label] = new ShapeClass(spectre, spectreKeys, label);
-    }
+	for( lab of ['Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 
+				 'Pi', 'Sigma', 'Phi', 'Psi'] ) {
+		ret[lab] = new Shape( hex, hex_keys, lab );
+	}
 
-    // Create the mystic (Gamma) tile
-    const mystic = new MetaTile();
-    mystic.addChild(
-        new ShapeClass(spectre, spectreKeys, 'Gamma1'),
-        IDENTITY_MATRIX
-    );
-    mystic.addChild(
-        new ShapeClass(spectre, spectreKeys, 'Gamma2'),
-        multiplyMatrices(translationMatrix(spectre[8].x, spectre[8].y), rotationMatrix(PI / 6))
-    );
-    mystic.quad = spectreKeys;
-    mystic.calculateRadius();
-    tiles['Gamma'] = mystic;
-
-    return tiles;
+	return ret;
 }
 
-/**
- * Builds the Hat and Turtle tile system
- * @param {boolean} hatDominant - Whether Hat or Turtle is dominant
- * @returns {Object} Dictionary of tile shapes
- */
-function buildHatTurtleBase(hatDominant) {
-    const sqrt3 = 1.7320508075688772;
-    const halfSqrt3 = 0.8660254037844386;
+function buildSupertiles( sys )
+{
+	// First, use any of the nine-unit tiles in sys to obtain
+	// a list of transformation matrices for placing tiles within
+	// supertiles.
 
-    function hexPoint(x, y) {
-        return createPoint(x + 0.5 * y, -halfSqrt3 * y);
-    }
+	const quad = sys['Delta'].quad;
+	const R = [-1,0,0,0,1,0];
+	
+	const t_rules = [
+		[60, 3, 1], [0, 2, 0], [60, 3, 1], [60, 3, 1],
+		[0, 2, 0], [60, 3, 1], [-120, 3, 3] ];  
 
-    const hat = [
-        hexPoint(-1, 2), hexPoint(0, 2), hexPoint(0, 3), hexPoint(2, 2),
-        hexPoint(3, 0), hexPoint(4, 0), hexPoint(5, -1), hexPoint(4, -2),
-        hexPoint(2, -1), hexPoint(2, -2), hexPoint(1, -2), hexPoint(0, -2),
-        hexPoint(-1, -1), hexPoint(0, 0)
-    ];
+	const Ts = [ident];
+	let total_ang = 0;
+	let rot = ident;
+	const tquad = [...quad];
+	for( const [ang,from,to] of t_rules ) {
+		total_ang += ang;
+		if( ang != 0 ) {
+			rot = trot( radians( total_ang ) );
+			for( i = 0; i < 4; ++i ) {
+				tquad[i] = transPt( rot, quad[i] );
+			}
+		}
 
-    const turtle = [
-        hexPoint(0, 0), hexPoint(2, -1), hexPoint(3, 0), hexPoint(4, -1),
-        hexPoint(4, -2), hexPoint(6, -3), hexPoint(7, -5), hexPoint(6, -5),
-        hexPoint(5, -4), hexPoint(4, -5), hexPoint(2, -4), hexPoint(0, -3),
-        hexPoint(-1, -1), hexPoint(0, -1)
-    ];
+		const ttt = transTo( tquad[to], 
+			transPt( Ts[Ts.length-1], quad[from] ) );
+		Ts.push( mul( ttt, rot ) );
+	}
 
-    const hatKeys = [hat[3], hat[5], hat[7], hat[11]];
-    const turtleKeys = [turtle[3], turtle[5], turtle[7], turtle[11]];
+	for( let idx = 0; idx < Ts.length; ++idx ) {
+		Ts[idx] = mul( R, Ts[idx] );
+	}
 
-    const tiles = {};
+	// Now build the actual supertiles, labelling appropriately.
+	const super_rules = {
+		'Gamma' :  ['Pi','Delta','null','Theta','Sigma','Xi','Phi','Gamma'],
+		'Delta' :  ['Xi','Delta','Xi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Theta' :  ['Psi','Delta','Pi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Lambda' : ['Psi','Delta','Xi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Xi' :     ['Psi','Delta','Pi','Phi','Sigma','Psi','Phi','Gamma'],
+		'Pi' :     ['Psi','Delta','Xi','Phi','Sigma','Psi','Phi','Gamma'],
+		'Sigma' :  ['Xi','Delta','Xi','Phi','Sigma','Pi','Lambda','Gamma'],
+		'Phi' :    ['Psi','Delta','Psi','Phi','Sigma','Pi','Phi','Gamma'],
+		'Psi' :    ['Psi','Delta','Psi','Phi','Sigma','Psi','Phi','Gamma'] };
+	const super_quad = [
+		transPt( Ts[6], quad[2] ),
+		transPt( Ts[5], quad[1] ),
+		transPt( Ts[3], quad[2] ),
+		transPt( Ts[0], quad[1] ) ]; 
 
-    if (hatDominant) {
-        for (let label of ['Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Phi', 'Psi']) {
-            tiles[label] = new Shape(hat, hatKeys, label);
-        }
+	const ret = {};
 
-        const mystic = new MetaTile();
-        mystic.addChild(new Shape(hat, hatKeys, 'Gamma1'), IDENTITY_MATRIX);
-        mystic.addChild(
-            new Shape(turtle, turtleKeys, 'Gamma2'),
-            translationMatrix(hat[8].x, hat[8].y)
-        );
-        mystic.quad = hatKeys;
-        mystic.calculateRadius();
-        tiles['Gamma'] = mystic;
-    } else {
-        for (let label of ['Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Phi', 'Psi']) {
-            tiles[label] = new Shape(turtle, turtleKeys, label);
-        }
+	for( const [lab, subs] of Object.entries( super_rules ) ) {
+		const sup = new Meta();
+		for( let idx = 0; idx < 8; ++idx ) {
+			if( subs[idx] == 'null' ) {
+				continue;
+			}
+			sup.addChild( sys[subs[idx]], Ts[idx] );
+		}
+		sup.quad = super_quad;
 
-        const mystic = new MetaTile();
-        mystic.addChild(new Shape(turtle, turtleKeys, 'Gamma1'), IDENTITY_MATRIX);
-        mystic.addChild(
-            new Shape(hat, hatKeys, 'Gamma2'),
-            multiplyMatrices(translationMatrix(turtle[9].x, turtle[9].y), rotationMatrix(PI / 3))
-        );
-        mystic.quad = turtleKeys;
-        mystic.calculateRadius();
-        tiles['Gamma'] = mystic;
-    }
+		ret[lab] = sup;
+	}
 
-    return tiles;
+	return ret;
 }
 
-/**
- * Builds a simple hexagonal tile system
- * @returns {Object} Dictionary of tile shapes
- */
-function buildHexBase() {
-    const halfSqrt3 = 0.8660254037844386;
-
-    const hex = [
-        createPoint(0, 0),
-        createPoint(1.0, 0.0),
-        createPoint(1.5, halfSqrt3),
-        createPoint(1, 2 * halfSqrt3),
-        createPoint(0, 2 * halfSqrt3),
-        createPoint(-0.5, halfSqrt3)
-    ];
-
-    const hexKeys = [hex[1], hex[2], hex[3], hex[5]];
-    const tiles = {};
-
-    for (let label of ['Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Phi', 'Psi']) {
-        tiles[label] = new Shape(hex, hexKeys, label);
-    }
-
-    return tiles;
+function isButtonActive( but )
+{
+	return but.elt.style.border.length > 0;
 }
 
-/**
- * Builds supertiles from a base tile system
- * @param {Object} sys - Base tile system
- * @returns {Object} Supertile system
- */
-function buildSupertiles(sys) {
-    const quad = sys['Delta'].quad;
-    const reflectionMatrix = [-1, 0, 0, 0, 1, 0];
-
-    const tileRules = [
-        [60, 3, 1], [0, 2, 0], [60, 3, 1], [60, 3, 1],
-        [0, 2, 0], [60, 3, 1], [-120, 3, 3]
-    ];
-
-    // Build transformation matrices
-    const transforms = [IDENTITY_MATRIX];
-    let totalAngle = 0;
-    let rotation = IDENTITY_MATRIX;
-    const transformedQuad = [...quad];
-    
-    for (const [angle, from, to] of tileRules) {
-        totalAngle += angle;
-        if (angle !== 0) {
-            rotation = rotationMatrix(radians(totalAngle));
-            for (let i = 0; i < 4; ++i) {
-                transformedQuad[i] = transformPoint(rotation, quad[i]);
-            }
-        }
-
-        const translation = translateTo(
-            transformedQuad[to],
-            transformPoint(transforms[transforms.length - 1], quad[from])
-        );
-        transforms.push(multiplyMatrices(translation, rotation));
-    }
-
-    // Apply reflection to all transforms
-    for (let idx = 0; idx < transforms.length; ++idx) {
-        transforms[idx] = multiplyMatrices(reflectionMatrix, transforms[idx]);
-    }
-
-    // Substitution rules for supertiles
-    const superRules = {
-        'Gamma': ['Pi', 'Delta', 'null', 'Theta', 'Sigma', 'Xi', 'Phi', 'Gamma'],
-        'Delta': ['Xi', 'Delta', 'Xi', 'Phi', 'Sigma', 'Pi', 'Phi', 'Gamma'],
-        'Theta': ['Psi', 'Delta', 'Pi', 'Phi', 'Sigma', 'Pi', 'Phi', 'Gamma'],
-        'Lambda': ['Psi', 'Delta', 'Xi', 'Phi', 'Sigma', 'Pi', 'Phi', 'Gamma'],
-        'Xi': ['Psi', 'Delta', 'Pi', 'Phi', 'Sigma', 'Psi', 'Phi', 'Gamma'],
-        'Pi': ['Psi', 'Delta', 'Xi', 'Phi', 'Sigma', 'Psi', 'Phi', 'Gamma'],
-        'Sigma': ['Xi', 'Delta', 'Xi', 'Phi', 'Sigma', 'Pi', 'Lambda', 'Gamma'],
-        'Phi': ['Psi', 'Delta', 'Psi', 'Phi', 'Sigma', 'Pi', 'Phi', 'Gamma'],
-        'Psi': ['Psi', 'Delta', 'Psi', 'Phi', 'Sigma', 'Psi', 'Phi', 'Gamma']
-    };
-    
-    const superQuad = [
-        transformPoint(transforms[6], quad[2]),
-        transformPoint(transforms[5], quad[1]),
-        transformPoint(transforms[3], quad[2]),
-        transformPoint(transforms[0], quad[1])
-    ];
-
-    const supertiles = {};
-
-    for (const [label, substitutions] of Object.entries(superRules)) {
-        const superTile = new MetaTile();
-        for (let idx = 0; idx < 8; ++idx) {
-            if (substitutions[idx] === 'null') {
-                continue;
-            }
-            superTile.addChild(sys[substitutions[idx]], transforms[idx]);
-        }
-        superTile.quad = superQuad;
-        superTile.calculateRadius();
-        supertiles[label] = superTile;
-    }
-
-    return supertiles;
+function setButtonActive( but, b )
+{
+	but.elt.style.border = (b ? "3px solid black" : "");
 }
 
-// =============================================================================
-// P5.JS LIFECYCLE FUNCTIONS
-// =============================================================================
-
-/**
- * p5.js setup function - initializes the canvas and UI
- */
 function setup() {
-    const canvas = createCanvas(windowWidth, windowHeight);
-    canvas.elt.style.touchAction = "none";
+	createCanvas( windowWidth, windowHeight );
 
-    tileSystem = buildSpectreBase();
+	sys = buildSpectreBase();
 
-    // Create UI elements
-    createUIElements();
+	let lab = createSpan( 'Shapes' );
+	lab.position( 10, 10 );
+	lab.size( 125, 15 );
+
+	shape_sel = createSelect();
+	shape_sel.position( 10, 30 );
+	shape_sel.size( 125, 25 );
+	shape_sel.option( 'Tile(1,1)' );
+	shape_sel.option( 'Spectres' );
+	shape_sel.option( 'Hexagons' );
+	shape_sel.option( 'Turtles in Hats' );
+	shape_sel.option( 'Hats in Turtles' );
+	shape_sel.changed( function() {
+		const s = shape_sel.value();
+		if( s == 'Hexagons' ) {
+			sys = buildHexBase();
+		} else if( s == 'Turtles in Hats' ) {
+			sys = buildHatTurtleBase( true );
+		} else if( s == 'Hats in Turtles' ) {
+			sys = buildHatTurtleBase( false );
+		} else if( s == 'Spectres' ) {
+			sys = buildSpectreBase( true );
+		} else {
+			sys = buildSpectreBase( false );
+		}
+		to_screen = [20, 0, 0, 0, -20, 0];
+		lw_scale = 1;
+		loop();
+	} );
+
+
+/*
+	reset_but = createButton( "Reset" );
+	reset_but.position( 10, 10 );
+	reset_but.size( 125, 25 );
+	reset_but.mousePressed( function() {
+		sys = buildSpectreBase();
+		to_screen = [20, 0, 0, 0, -20, 0];
+		lw_scale = 0.2;
+		loop();
+	} );
+	*/
+
+	subst_button = createButton( "Build Supertiles" );
+	subst_button.position( 10, 60 );
+	subst_button.size( 125, 25 );
+	subst_button.mousePressed( function() {
+		sys = buildSupertiles( sys );	
+		loop();
+	} );
+
+	lab = createSpan( 'Category' );
+	lab.position( 10, 100 );
+	lab.size( 125, 15 );
+
+	tile_sel = createSelect();
+	tile_sel.position( 10, 120 );
+	tile_sel.size( 125, 25 );
+	for( let name of tile_names ) {
+		tile_sel.option( name );
+	}
+	tile_sel.value( 'Delta' );
+	tile_sel.changed( loop );
+
+	lab = createSpan( 'Colours' );
+	lab.position( 10, 150 );
+	lab.size( 125, 15 );
+
+	colscheme_sel = createSelect();
+	colscheme_sel.position( 10, 170 );
+	colscheme_sel.size( 125, 25 );
+	colscheme_sel.option( 'Pride' );
+	colscheme_sel.option( 'Mystics' );
+	colscheme_sel.option( 'Figure 5.3' );
+	colscheme_sel.option( 'Bright' );
+	colscheme_sel.changed( loop );
+
+	translate_button = createButton( "Translate" );
+	setButtonActive( translate_button, true );
+	translate_button.position( 10, 210 );
+	translate_button.size( 125, 25 );
+	translate_button.mousePressed( function() {
+		setButtonActive( translate_button, true );
+		setButtonActive( scale_button, false );
+		loop();
+	} );
+
+	scale_button = createButton( "Scale" );
+	scale_button.position( 10, 240 );
+	scale_button.size( 125, 25 );
+	scale_button.mousePressed( function() {
+		setButtonActive( translate_button, false );
+		setButtonActive( scale_button, true );
+		loop();
+	} );
+	
+	let save_button = createButton( "Save PNG" );
+	save_button.position( 10, 280 );
+	save_button.size( 125, 25 );
+	save_button.mousePressed( function () {
+		uibox = false;
+		draw();
+		save( "output.png" );
+		uibox = true;
+		draw();
+	} );
+
+	let svg_button = createButton( "Save SVG" );
+	svg_button.position( 10, 310 );
+	svg_button.size( 125, 25 );
+    svg_button.mousePressed( function () {
+        const stream = [];
+        stream.push( `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">` );
+		stream.push( `<g transform="translate(${width/2},${height/2})">` );
+
+		sys[tile_sel.value()].streamSVG( to_screen, stream );
+
+        stream.push( '</g>' );
+        stream.push( '</svg>' );
+
+        saveStrings( stream, 'output', 'svg' );
+    } );
 }
 
-/**
- * Creates all UI control elements
- */
-function createUIElements() {
-    // Shapes selector
-    let label = createSpan('Shapes');
-    label.position(10, 10);
-    label.size(125, 15);
+function draw()
+{
+	background( 255 );
 
-    shapeSelector = createSelect();
-    shapeSelector.position(10, 30);
-    shapeSelector.size(125, 25);
-    shapeSelector.option('Tile(1,1)');
-    shapeSelector.option('Spectres');
-    shapeSelector.option('Hexagons');
-    shapeSelector.option('Turtles in Hats');
-    shapeSelector.option('Hats in Turtles');
-    shapeSelector.changed(handleShapeChange);
+	push();
+	translate( width/2, height/2 );
 
-    // Tile count display
-    label = createSpan('Tiles in View:');
-    label.position(10, 60);
-    label.size(125, 15);
-    
-    tileCountDisplay = createSpan('0');
-    tileCountDisplay.position(10, 80);
-    tileCountDisplay.style('font-size', '16px');
-    tileCountDisplay.style('font-weight', 'bold');
+	applyMatrix( 
+		to_screen[0], to_screen[3], 
+		to_screen[1], to_screen[4], 
+		to_screen[2], to_screen[5] );
 
-    // Category selector
-    label = createSpan('Category');
-    label.position(10, 110);
-    label.size(125, 15);
+	const s = colscheme_sel.value();
+	if( s == 'Figure 5.3' ) {
+		colmap = colmap53;
+	} else if( s == 'Bright' ) {
+		colmap = colmap_orig;
+	} else if( s == 'Pride' ) {
+		colmap = colmap_pride;
+	} else {
+		colmap = colmap_mystics;
+	}
 
-    tileSelector = createSelect();
-    tileSelector.position(10, 130);
-    tileSelector.size(125, 25);
-    for (let name of TILE_NAMES) {
-        tileSelector.option(name);
-    }
-    tileSelector.value('Delta');
-    tileSelector.changed(loop);
+	sys[tile_sel.value()].draw( ident );
 
-    // Save SVG button
-    const saveSvgButton = createButton("Save SVG");
-    saveSvgButton.position(10, 170);
-    saveSvgButton.size(125, 25);
-    saveSvgButton.mousePressed(handleSaveSVG);
+	pop();
 
-    // Number tiles checkbox
-    numberCheckbox = createCheckbox('Number Tiles', false);
-    numberCheckbox.position(10, 210);
-    numberCheckbox.changed(loop);
+	if( uibox ) {
+		stroke( 0 );
+		strokeWeight( 0.5 );
+		fill( 255, 220 );
+		rect( 5, 5, 135, 335 );
+	}
+	noLoop();
 }
 
-/**
- * Handles shape selection change
- */
-function handleShapeChange() {
-    const selectedShape = shapeSelector.value();
-    
-    if (selectedShape === 'Hexagons') {
-        tileSystem = buildHexBase();
-    } else if (selectedShape === 'Turtles in Hats') {
-        tileSystem = buildHatTurtleBase(true);
-    } else if (selectedShape === 'Hats in Turtles') {
-        tileSystem = buildHatTurtleBase(false);
-    } else if (selectedShape === 'Spectres') {
-        tileSystem = buildSpectreBase(true);
-    } else {
-        tileSystem = buildSpectreBase(false);
-    }
-    
-    toScreenTransform = [20, 0, 0, 0, -20, 0];
-    lineWeightScale = 1;
-    generationLevel = 0;
-    loop();
+function windowResized() 
+{
+	resizeCanvas( windowWidth, windowHeight );
 }
 
-/**
- * Handles SVG save button press
- */
-function handleSaveSVG() {
-    const stream = [];
-    stream.push(`<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`);
-    stream.push(`<g transform="translate(${width / 2},${height / 2})">`);
-
-    drawCounter = 1;
-    streamDenseTilingSVG(stream);
-
-    stream.push('</g>');
-    stream.push('</svg>');
-
-    saveStrings(stream, 'output', 'svg');
+function mousePressed()
+{
+	dragging = true;
+	if( isButtonActive( scale_button ) ) {
+		scale_centre = transPt( inv( to_screen ), pt( width/2, height/2 ) );
+		scale_start = pt( mouseX, mouseY );
+		scale_ts = [...to_screen];
+	}
+	loop();
 }
 
-/**
- * Streams dense tiling to SVG format
- * @param {Array<string>} stream - Output stream for SVG strings
- */
-function streamDenseTilingSVG(stream) {
-    const currentTile = tileSystem[tileSelector.value()];
-    const quad = currentTile.quad;
-    
-    // Compute two translation vectors from the quad points
-    // These vectors define the periodic structure of the supertile arrangement
-    const vec1 = subtractPoints(quad[1], quad[0]);
-    const vec2 = subtractPoints(quad[3], quad[0]);
-    
-    // Calculate how many copies we need to cover the viewport
-    const inverseTransform = invertMatrix(toScreenTransform);
-    const corners = [
-        transformPoint(inverseTransform, createPoint(-width / 2, -height / 2)),
-        transformPoint(inverseTransform, createPoint(width / 2, -height / 2)),
-        transformPoint(inverseTransform, createPoint(width / 2, height / 2)),
-        transformPoint(inverseTransform, createPoint(-width / 2, height / 2))
-    ];
-    
-    // Find the bounds in world space
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let corner of corners) {
-        minX = Math.min(minX, corner.x);
-        maxX = Math.max(maxX, corner.x);
-        minY = Math.min(minY, corner.y);
-        maxY = Math.max(maxY, corner.y);
-    }
-    
-    // Calculate grid range needed (with extra buffer to ensure complete coverage)
-    const vecLength = Math.max(
-        Math.hypot(vec1.x, vec1.y),
-        Math.hypot(vec2.x, vec2.y)
-    );
-    
-    if (vecLength < 0.001) {
-        // Fallback for base tiles
-        currentTile.streamSVG(toScreenTransform, stream);
-        return;
-    }
-    
-    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 4;
-    
-    // Stream grid of tile copies with double density for better coverage
-    for (let i = -range * 2; i <= range * 2; i++) {
-        for (let j = -range * 2; j <= range * 2; j++) {
-            const offsetX = (i * 0.5) * vec1.x + (j * 0.5) * vec2.x;
-            const offsetY = (i * 0.5) * vec1.y + (j * 0.5) * vec2.y;
-            const transform = multiplyMatrices(toScreenTransform, translationMatrix(offsetX, offsetY));
-            currentTile.streamSVG(transform, stream);
-        }
-    }
+function mouseDragged()
+{
+	if( dragging ) {
+		if( isButtonActive( translate_button ) ) {
+			to_screen = mul( ttrans( mouseX - pmouseX, mouseY - pmouseY ), 
+				to_screen );
+		} else if( isButtonActive( scale_button ) ) {
+			let sc = dist( mouseX, mouseY, width/2, height/2 ) / 
+				dist( scale_start.x, scale_start.y, width/2, height/2 );
+			to_screen = mul( 
+				mul( ttrans( scale_centre.x, scale_centre.y ),
+					mul( [sc, 0, 0, 0, sc, 0],
+						ttrans( -scale_centre.x, -scale_centre.y ) ) ),
+				scale_ts );
+			lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+		}
+		loop();
+		return false;
+	} 
 }
 
-/**
- * p5.js draw function - renders the current view
- */
-function draw() {
-    background(255);
-
-    // Auto-expansion logic: expand tiles if viewport exceeds current tile radius
-    autoExpandTiles();
-
-    push();
-    translate(width / 2, height / 2);
-
-    applyMatrix(
-        toScreenTransform[0], toScreenTransform[3],
-        toScreenTransform[1], toScreenTransform[4],
-        toScreenTransform[2], toScreenTransform[5]
-    );
-
-    // Use white color scheme for all tiles
-    currentColorMap = COLOR_SCHEMES.white;
-
-    // Draw tiles with dense tiling - use grid of copies to ensure full coverage
-    drawCounter = 1;
-    tilesDrawnCount = 0;
-    drawDenseTiling();
-
-    pop();
-
-    // Update tile count display
-    if (tileCountDisplay) {
-        tileCountDisplay.html(tilesDrawnCount);
-    }
-
-    // Draw UI box
-    if (showUIBox) {
-        stroke(0);
-        strokeWeight(0.5);
-        fill(255, 220);
-        rect(UI_BOX_X, UI_BOX_Y, UI_BOX_WIDTH, UI_BOX_HEIGHT);
-    }
-    
-    noLoop();
+function mouseReleased()
+{
+	dragging = false;
+	loop();
 }
 
-/**
- * Draws tiles in a dense pattern to ensure full viewport coverage.
- * Uses the supertile's quad points to compute translation vectors for tiling.
- */
-function drawDenseTiling() {
-    const currentTile = tileSystem[tileSelector.value()];
-    const quad = currentTile.quad;
-    
-    // Compute two translation vectors from the quad points
-    // These vectors define the periodic structure of the supertile arrangement
-    const vec1 = subtractPoints(quad[1], quad[0]);
-    const vec2 = subtractPoints(quad[3], quad[0]);
-    
-    // Calculate how many copies we need to cover the viewport
-    const inverseTransform = invertMatrix(toScreenTransform);
-    const corners = [
-        transformPoint(inverseTransform, createPoint(-width / 2, -height / 2)),
-        transformPoint(inverseTransform, createPoint(width / 2, -height / 2)),
-        transformPoint(inverseTransform, createPoint(width / 2, height / 2)),
-        transformPoint(inverseTransform, createPoint(-width / 2, height / 2))
-    ];
-    
-    // Find the bounds in world space
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let corner of corners) {
-        minX = Math.min(minX, corner.x);
-        maxX = Math.max(maxX, corner.x);
-        minY = Math.min(minY, corner.y);
-        maxY = Math.max(maxY, corner.y);
-    }
-    
-    // Calculate grid range needed (with extra buffer to ensure complete coverage)
-    const vecLength = Math.max(
-        Math.hypot(vec1.x, vec1.y),
-        Math.hypot(vec2.x, vec2.y)
-    );
-    
-    if (vecLength < 0.001) {
-        // Fallback for base tiles without meaningful quad vectors
-        currentTile.draw(IDENTITY_MATRIX);
-        return;
-    }
-    
-    const range = Math.ceil(Math.max(maxX - minX, maxY - minY) / vecLength) + 4;
-    
-    // Draw grid of tile copies with double density for better coverage
-    for (let i = -range * 2; i <= range * 2; i++) {
-        for (let j = -range * 2; j <= range * 2; j++) {
-            const offsetX = (i * 0.5) * vec1.x + (j * 0.5) * vec2.x;
-            const offsetY = (i * 0.5) * vec1.y + (j * 0.5) * vec2.y;
-            const transform = translationMatrix(offsetX, offsetY);
-            currentTile.draw(transform);
-        }
-    }
-}
-
-/**
- * Automatically expands the tile system if needed
- * Ensures dense tiling by expanding until tiles fully cover viewport
- */
-function autoExpandTiles() {
-    const inverseTransform = invertMatrix(toScreenTransform);
-    
-    // Calculate screen corners in world space
-    const corners = [
-        createPoint(-width / 2, -height / 2),
-        createPoint(width / 2, -height / 2),
-        createPoint(width / 2, height / 2),
-        createPoint(-width / 2, height / 2)
-    ];
-    
-    let maxDistance = 0;
-    for (let corner of corners) {
-        const worldPoint = transformPoint(inverseTransform, corner);
-        const distance = Math.hypot(worldPoint.x, worldPoint.y);
-        if (distance > maxDistance) {
-            maxDistance = distance;
-        }
-    }
-    
-    // Add buffer for dense tiling: expand beyond viewport to ensure full coverage
-    // The DENSE_TILING_BUFFER value (1.5x) balances performance (avoiding excessive
-    // tile generation) with coverage (ensuring no whitespace appears during zoom/pan/resize)
-    maxDistance *= DENSE_TILING_BUFFER;
-    
-    // Expand if necessary
-    let currentTile = tileSystem[tileSelector.value()];
-    let loopGuard = 0;
-    
-    while (currentTile.radius < maxDistance && 
-           generationLevel < MAX_GEN_LEVEL && 
-           loopGuard < 5) {
-        tileSystem = buildSupertiles(tileSystem);
-        generationLevel++;
-        currentTile = tileSystem[tileSelector.value()];
-        loopGuard++;
-    }
-}
-
-/**
- * p5.js window resize handler
- */
-function windowResized() {
-    resizeCanvas(windowWidth, windowHeight);
-}
-
-// =============================================================================
-// INTERACTION HANDLERS
-// =============================================================================
-
-/**
- * Mouse wheel handler for zooming
- */
-function mouseWheel(event) {
-    const zoom = event.delta > 0 ? 0.9 : 1.1;
-    const mx = mouseX - width / 2;
-    const my = mouseY - height / 2;
-    const t1 = translationMatrix(mx, my);
-    const scale = [zoom, 0, 0, 0, zoom, 0];
-    const t2 = translationMatrix(-mx, -my);
-    const operation = multiplyMatrices(t1, multiplyMatrices(scale, t2));
-    toScreenTransform = multiplyMatrices(operation, toScreenTransform);
-    loop();
-    return false;
-}
-
-/**
- * Mouse press handler
- */
-function mousePressed() {
-    // Ignore if clicking on UI
-    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
-        return;
-    }
-    isDragging = true;
-    loop();
-}
-
-/**
- * Mouse drag handler for panning
- */
-function mouseDragged() {
-    if (isDragging && touches.length < 2) {
-        toScreenTransform = multiplyMatrices(
-            translationMatrix(mouseX - pmouseX, mouseY - pmouseY),
-            toScreenTransform
-        );
-        loop();
-        return false;
-    }
-}
-
-/**
- * Mouse release handler
- */
-function mouseReleased() {
-    isDragging = false;
-    loop();
-}
-
-/**
- * Touch start handler
- */
-function touchStarted() {
-    // Ignore if touching UI
-    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
-        return;
-    }
-    
-    if (touches.length === 2) {
-        previousTouchDistance = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
-        previousTouchCenter = createPoint(
-            (touches[0].x + touches[1].x) / 2,
-            (touches[0].y + touches[1].y) / 2
-        );
-    }
-    return false;
-}
-
-/**
- * Touch move handler for pinch-zoom and pan
- */
-function touchMoved() {
-    // Ignore if touching UI
-    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
-        return;
-    }
-    
-    if (touches.length === 2) {
-        const currentDistance = dist(touches[0].x, touches[0].y, touches[1].x, touches[1].y);
-        const currentCenter = createPoint(
-            (touches[0].x + touches[1].x) / 2,
-            (touches[0].y + touches[1].y) / 2
-        );
-
-        if (previousTouchDistance > 0) {
-            const scale = currentDistance / previousTouchDistance;
-            const centerXPrev = previousTouchCenter.x - width / 2;
-            const centerYPrev = previousTouchCenter.y - height / 2;
-            const centerXCurr = currentCenter.x - width / 2;
-            const centerYCurr = currentCenter.y - height / 2;
-
-            const tNew = translationMatrix(centerXCurr, centerYCurr);
-            const scaleMatrix = [scale, 0, 0, 0, scale, 0];
-            const tOld = translationMatrix(-centerXPrev, -centerYPrev);
-
-            const operation = multiplyMatrices(tNew, multiplyMatrices(scaleMatrix, tOld));
-            toScreenTransform = multiplyMatrices(operation, toScreenTransform);
-        }
-
-        previousTouchDistance = currentDistance;
-        previousTouchCenter = currentCenter;
-        loop();
-        return false;
-    }
-    return false;
-}
-
-/**
- * Touch end handler
- */
-function touchEnded() {
-    if (touches.length < 2) {
-        previousTouchDistance = -1;
-        previousTouchCenter = null;
-    }
-    return false;
-}
