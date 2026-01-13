@@ -14,6 +14,11 @@
 
 const IDENTITY_MATRIX = [1, 0, 0, 0, 1, 0];
 const MAX_GEN_LEVEL = 8; // Prevent memory crash by capping recursion
+const DENSE_TILING_BUFFER = 1.5; // Multiplier for viewport coverage buffer
+const UI_BOX_WIDTH = 135;
+const UI_BOX_HEIGHT = 255;
+const UI_INTERACTION_WIDTH = 150;
+const UI_INTERACTION_HEIGHT = 270;
 
 const TILE_NAMES = [
     'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
@@ -1024,7 +1029,7 @@ function draw() {
         stroke(0);
         strokeWeight(0.5);
         fill(255, 220);
-        rect(5, 5, 135, 255);
+        rect(5, 5, UI_BOX_WIDTH, UI_BOX_HEIGHT);
     }
     
     noLoop();
@@ -1055,10 +1060,9 @@ function autoExpandTiles() {
     }
     
     // Add buffer for dense tiling: expand beyond viewport to ensure full coverage
-    // Multiply by 1.5 to ensure tiles always fill the viewport with margin
-    // This value balances performance (avoiding excessive tile generation) with
-    // coverage (ensuring no whitespace appears during zoom/pan/resize)
-    maxDistance *= 1.5;
+    // The DENSE_TILING_BUFFER value balances performance (avoiding excessive tile
+    // generation) with coverage (ensuring no whitespace appears during zoom/pan/resize)
+    maxDistance *= DENSE_TILING_BUFFER;
     
     // Expand if necessary
     let currentTile = tileSystem[tileSelector.value()];
@@ -1106,7 +1110,7 @@ function mouseWheel(event) {
  */
 function mousePressed() {
     // Ignore if clicking on UI
-    if (mouseX < 150 && mouseY < 270) {
+    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
         return;
     }
     isDragging = true;
@@ -1140,7 +1144,7 @@ function mouseReleased() {
  */
 function touchStarted() {
     // Ignore if touching UI
-    if (mouseX < 150 && mouseY < 270) {
+    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
         return;
     }
     
@@ -1159,7 +1163,7 @@ function touchStarted() {
  */
 function touchMoved() {
     // Ignore if touching UI
-    if (mouseX < 150 && mouseY < 270) {
+    if (mouseX < UI_INTERACTION_WIDTH && mouseY < UI_INTERACTION_HEIGHT) {
         return;
     }
     
