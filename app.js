@@ -20,7 +20,7 @@ const DENSE_TILING_BUFFER = 1.5; // Multiplier for viewport coverage buffer
 const UI_BOX_X = 5;
 const UI_BOX_Y = 5;
 const UI_BOX_WIDTH = 135;
-const UI_BOX_HEIGHT = 255;
+const UI_BOX_HEIGHT = 235; // Height to contain all UI elements (last element at y=210 + ~25px)
 const UI_PADDING = 15; // Extra padding for interaction area beyond visible box
 const UI_INTERACTION_WIDTH = UI_BOX_WIDTH + UI_PADDING;
 const UI_INTERACTION_HEIGHT = UI_BOX_HEIGHT + UI_PADDING;
@@ -1065,8 +1065,8 @@ function autoExpandTiles() {
     }
     
     // Add buffer for dense tiling: expand beyond viewport to ensure full coverage
-    // The DENSE_TILING_BUFFER value balances performance (avoiding excessive tile
-    // generation) with coverage (ensuring no whitespace appears during zoom/pan/resize)
+    // The DENSE_TILING_BUFFER value (1.5x) balances performance (avoiding excessive
+    // tile generation) with coverage (ensuring no whitespace appears during zoom/pan/resize)
     maxDistance *= DENSE_TILING_BUFFER;
     
     // Expand if necessary
