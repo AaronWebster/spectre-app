@@ -38,3 +38,30 @@ The codebase follows modern JavaScript best practices:
 - Descriptive variable and function names
 - Organized code structure with clear sections
 - Proper encapsulation with classes
+
+## Testing
+
+The project includes a comprehensive unit test suite for the mathematical rendering functions based on the original paper "A Chiral Aperiodic Monotile" (2305.17743v2.pdf).
+
+### Running Tests
+
+```bash
+npm install
+npm test
+```
+
+### Test Coverage
+
+The test suite includes **67 tests** organized into 10 suites:
+- Point operations (5 tests)
+- Affine matrix operations (20 tests)
+- Spectre tile geometry (8 tests)
+- Hat and Turtle tile geometry (7 tests)
+- Hexagon tile geometry (5 tests)
+- Supertile substitution system (5 tests)
+- Mathematical constants (4 tests)
+- Determinant and matrix properties (5 tests)
+- Tile substitution rules (2 tests)
+- Edge cases and boundary conditions (5 tests)
+
+See [TEST_DOCUMENTATION.md](TEST_DOCUMENTATION.md) for detailed information about the test suite.
