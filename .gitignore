@@ -6,6 +6,9 @@ npm-debug.log*
 *.png
 *.svg
 
+# But include the favicon
+!favicon.ico
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -21,3 +24,6 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# Favicon generation script (temporary)
+generate_favicon.js
