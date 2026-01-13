@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Tile Vectors</title>
+    <script src="p5.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+    window.setup = function() {
+        createCanvas(100, 100);
+        
+        // Get the transforms  
+        let sys = buildSpectreBase();
+        let baseQuad = sys['Delta'].quad;
+        
+        const reflectionMatrix = [-1, 0, 0, 0, 1, 0];
+        const tileRules = [
+            [60, 3, 1], [0, 2, 0], [60, 3, 1], [60, 3, 1],
+            [0, 2, 0], [60, 3, 1], [-120, 3, 3]
+        ];
+        
+        function radians(deg) { return deg * Math.PI / 180; }
+        function rotationMatrix(angle) {
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            return [c, -s, 0, s, c, 0];
+        }
+        function translationMatrix(tx, ty) {
+            return [1, 0, tx, 0, 1, ty];
+        }
+        function multiplyMatrices(A, B) {
+            return [
+                A[0] * B[0] + A[1] * B[3],
+                A[0] * B[1] + A[1] * B[4],
+                A[0] * B[2] + A[1] * B[5] + A[2],
+                A[3] * B[0] + A[4] * B[3],
+                A[3] * B[1] + A[4] * B[4],
+                A[3] * B[2] + A[4] * B[5] + A[5]
+            ];
+        }
+        function transformPoint(M, P) {
+            return {
+                x: M[0] * P.x + M[1] * P.y + M[2],
+                y: M[3] * P.x + M[4] * P.y + M[5]
+            };
+        }
+        function translateTo(p, q) {
+            return translationMatrix(q.x - p.x, q.y - p.y);
+        }
+        
+        const transforms = [[1, 0, 0, 0, 1, 0]];
+        let totalAngle = 0;
+        let rotation = [1, 0, 0, 0, 1, 0];
+        const transformedQuad = [...baseQuad];
+        
+        for (const [angle, from, to] of tileRules) {
+            totalAngle += angle;
+            if (angle !== 0) {
+                rotation = rotationMatrix(radians(totalAngle));
+                for (let i = 0; i < 4; ++i) {
+                    transformedQuad[i] = transformPoint(rotation, baseQuad[i]);
+                }
+            }
+            
+            const translation = translateTo(
+                transformedQuad[to],
+                transformPoint(transforms[transforms.length - 1], baseQuad[from])
+            );
+            transforms.push(multiplyMatrices(translation, rotation));
+        }
+        
+        for (let idx = 0; idx < transforms.length; ++idx) {
+            transforms[idx] = multiplyMatrices(reflectionMatrix, transforms[idx]);
+        }
+        
+        // Compute superQuad
+        const superQuad = [
+            transformPoint(transforms[6], baseQuad[2]),
+            transformPoint(transforms[5], baseQuad[1]),
+            transformPoint(transforms[3], baseQuad[2]),
+            transformPoint(transforms[0], baseQuad[1])
+        ];
+        
+        console.log('SuperQuad analysis:');
+        console.log('superQuad[0] = T[6](baseQuad[2]) =', superQuad[0]);
+        console.log('superQuad[1] = T[5](baseQuad[1]) =', superQuad[1]);
+        console.log('superQuad[2] = T[3](baseQuad[2]) =', superQuad[2]);
+        console.log('superQuad[3] = T[0](baseQuad[1]) =', superQuad[3]);
+        
+        // The idea: the superQuad encodes which points should match when tiling
+        // superQuad[0] and superQuad[2] are both baseQuad[2] transformed differently
+        // This suggests that when we translate by vec = superQuad[2] - superQuad[0],
+        // the baseQuad[2] point of one supertile aligns with baseQuad[2] of another
+        
+        console.log('\nProposed tiling vectors (from transform differences):');
+        let vec1 = {x: superQuad[2].x - superQuad[0].x, y: superQuad[2].y - superQuad[0].y};
+        let vec2 = {x: superQuad[1].x - superQuad[3].x, y: superQuad[1].y - superQuad[3].y};
+        console.log('vec1 = superQuad[2] - superQuad[0] =', vec1);
+        console.log('vec2 = superQuad[1] - superQuad[3] =', vec2);
+        
+        // But we need both vectors from the same origin for grid tiling
+        // Let's try to construct a proper parallelogram by finding the best fit
+        
+        // Alternative: use the actual extents of the supertile
+        let origin = {x: 0, y: 0};
+        let tileOrigins = [];
+        for (let i = 0; i < 8; i++) {
+            tileOrigins.push(transformPoint(transforms[i], origin));
+        }
+        
+        console.log('\nTile origins:');
+        for (let i = 0; i < 8; i++) {
+            console.log(`  Tile ${i}:`, tileOrigins[i]);
+        }
+        
+        // Find the bounding box
+        let minX = Math.min(...tileOrigins.map(p => p.x));
+        let maxX = Math.max(...tileOrigins.map(p => p.x));
+        let minY = Math.min(...tileOrigins.map(p => p.y));
+        let maxY = Math.max(...tileOrigins.map(p => p.y));
+        
+        console.log('\nBounding box:');
+        console.log('  X: [', minX, ',', maxX, ']');
+        console.log('  Y: [', minY, ',', maxY, ']');
+        console.log('  Width:', maxX - minX);
+        console.log('  Height:', maxY - minY);
+        
+        // The supertile's actual size suggests possible tiling vectors
+        // But this still doesn't guarantee seamless tiling for an aperiodic tile!
+    };
+    </script>
+</head>
+<body></body>
+</html>
