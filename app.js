@@ -26,6 +26,7 @@ let boundingBoxHeight = 100;
 // UI Elements
 let tile_sel, shape_sel, colscheme_sel, tile_count_label;
 let tileScaleInput, boundingBoxWidthInput, boundingBoxHeightInput;
+let groutInput, kerfInput;
 
 const tile_names = [ 
 	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
@@ -193,13 +194,33 @@ class Shape {
 	}
 
 	draw(ctx) {
+        // Apply transform to points to get World Space (or Screen Space if that's what we want)
+        // For manufacturing, we want the raw coordinates scaled by tileScale, 
+        // but NOT shifted by screen panning (to_screen).
+        // However, the current recursive system bakes everything into the ctx matrix.
+        
 		const isOutside = isTileOutsideBounds(this.pts, ctx);
+		
+        if (window.isExporting) {
+            // In Export mode, we ignore bounds (or keep them if you want only visible)
+            // We must extract the absolute coordinates.
+            if (!isOutside) {
+                const t = ctx.getTransform();
+                const worldPts = this.pts.map(p => {
+                    return {
+                        x: t.a * p.x + t.c * p.y + t.e,
+                        y: t.b * p.x + t.d * p.y + t.f
+                    };
+                });
+                window.exportedShapes.push(worldPts);
+            }
+            return;
+        }
+
 		if (!isOutside) {
-			// Only draw if tile is inside bounds
 			drawPolygon( ctx, this.pts, colmap[this.label], [0,0,0], 0.1 );
 			visibleTileCount++;
 		}
-		// Always count the tile even if not visible
 		tileCount++;
 	}
 
@@ -587,25 +608,37 @@ function createUI() {
         link.click();
     });
     
-    // Tile Count Label
-    tile_count_label = addLabel('Tiles: 0', 10, 270);
+    // --- Manufacturing UI Section ---
+    addLabel('--- Manufacturing ---', 10, 275);
     
-    // Tile Scale
-    addLabel('Tile Scale', 10, 300);
-    tileScaleInput = addNumberInput(10, 320, tileScale, 0.1, 10, 0.1, (value) => {
+    addLabel('Grout (in):', 10, 295);
+    groutInput = addNumberInput(80, 292, 0.125, 0, 1, 0.001, () => {});
+
+    addLabel('Kerf (in):', 10, 320);
+    kerfInput = addNumberInput(80, 317, 0.040, 0, 1, 0.001, () => {});
+
+    addButton('Export DXF', 10, 345, () => {
+        startExport();
+    });
+
+    // --- View Controls ---
+    addLabel('Tile Scale', 10, 380);
+    tileScaleInput = addNumberInput(10, 400, tileScale, 0.1, 50, 0.1, (value) => {
         tileScale = value;
         needsRedraw = true;
     });
     
-    // Bounding Box
-    addLabel('Bounding Box', 10, 350);
-    addLabel('Width:', 10, 370);
-    boundingBoxWidthInput = addNumberInput(70, 367, boundingBoxWidth, 10, 1000, 10, (value) => {
+    // Tile Count Label
+    tile_count_label = addLabel('Tiles: 0', 80, 400);
+
+    addLabel('Bounding Box', 10, 430);
+    addLabel('W:', 10, 450);
+    boundingBoxWidthInput = addNumberInput(30, 447, boundingBoxWidth, 10, 1000, 10, (value) => {
         boundingBoxWidth = value;
         needsRedraw = true;
     });
-    addLabel('Height:', 10, 395);
-    boundingBoxHeightInput = addNumberInput(70, 392, boundingBoxHeight, 10, 1000, 10, (value) => {
+    addLabel('H:', 80, 450);
+    boundingBoxHeightInput = addNumberInput(100, 447, boundingBoxHeight, 10, 1000, 10, (value) => {
         boundingBoxHeight = value;
         needsRedraw = true;
     });
@@ -855,12 +888,192 @@ function draw() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 0.5;
-        ctx.fillRect(5, 5, 135, 420); // Updated height for new UI elements
-        ctx.strokeRect(5, 5, 135, 420);
+        ctx.fillRect(5, 5, 135, 480); // Updated height for manufacturing controls
+        ctx.strokeRect(5, 5, 135, 480);
     }
     
     // Update tile count display
     if(tile_count_label) {
         tile_count_label.innerText = `Tiles: ${visibleTileCount}`;
     }
+}
+
+// --- Manufacturing Logic ---
+
+// 1. Polygon Erosion (Offsetting)
+function offsetPolygon(pts, delta) {
+    const result = [];
+    const len = pts.length;
+    
+    // Helper: intersection of two infinite lines defined by (p1, v1) and (p2, v2)
+    function intersect(p1, v1, p2, v2) {
+        const det = v1.x * v2.y - v1.y * v2.x;
+        if (Math.abs(det) < 1e-8) return null; // Parallel
+        const t = ((p2.x - p1.x) * v2.y - (p2.y - p1.y) * v2.x) / det;
+        return { x: p1.x + t * v1.x, y: p1.y + t * v1.y };
+    }
+
+    // Calculate shifted lines for each edge
+    const lines = [];
+    for (let i = 0; i < len; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % len];
+        
+        let dx = p2.x - p1.x;
+        let dy = p2.y - p1.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        dx /= dist; dy /= dist;
+        
+        // Normal vector (inwards or outwards depending on winding)
+        // Assuming standard winding, we shift by normal (-dy, dx)
+        const nx = -dy;
+        const ny = dx;
+        
+        const ox = delta * nx;
+        const oy = delta * ny;
+        
+        lines.push({
+            p: { x: p1.x + ox, y: p1.y + oy },
+            v: { x: dx, y: dy }
+        });
+    }
+
+    // Reconstruct vertices from line intersections
+    for (let i = 0; i < len; i++) {
+        const l1 = lines[i];
+        const l2 = lines[(i + 1) % len];
+        const p = intersect(l1.p, l1.v, l2.p, l2.v);
+        if (p) result.push(p);
+    }
+    
+    return result;
+}
+
+// 2. Path Optimization (Greedy Nearest Neighbor)
+function optimizeCutPath(shapes) {
+    if (shapes.length === 0) return [];
+    
+    const optimized = [];
+    const remaining = new Set(shapes);
+    
+    // Start at origin (machine home)
+    let currentPos = { x: 0, y: 0 };
+    
+    while (remaining.size > 0) {
+        let nearest = null;
+        let minRate = Infinity;
+        
+        // Find closest start point of any remaining shape
+        for (const shape of remaining) {
+            // Check distance to first point of shape
+            const d = dist(currentPos.x, currentPos.y, shape[0].x, shape[0].y);
+            if (d < minRate) {
+                minRate = d;
+                nearest = shape;
+            }
+        }
+        
+        if (nearest) {
+            optimized.push(nearest);
+            remaining.delete(nearest);
+            // Machine ends at the last point of this shape (which is same as first for closed loop)
+            // But realistically, the rapid travel starts from where the cut finished.
+            currentPos = nearest[nearest.length - 1]; 
+        } else {
+            break; // Should not happen
+        }
+    }
+    return optimized;
+}
+
+// 3. DXF Generation (Compatible with OMAX Layout)
+function exportDXF(shapes) {
+    let d = "";
+    // Header
+    d += "0\nSECTION\n2\nENTITIES\n";
+    
+    for (const shape of shapes) {
+        d += "0\nLWPOLYLINE\n";
+        d += "8\n0\n"; // Layer 0
+        d += "62\n7\n"; // Color White
+        d += "90\n" + shape.length + "\n"; // Number of vertices
+        d += "70\n1\n"; // 1 = Closed flag
+        
+        for (const p of shape) {
+            d += "10\n" + p.x.toFixed(4) + "\n";
+            d += "20\n" + p.y.toFixed(4) + "\n";
+        }
+    }
+    
+    d += "0\nENDSEC\n0\nEOF\n";
+    
+    // Trigger Download
+    const blob = new Blob([d], {type: "application/dxf"});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = "spectre_cut_optimized.dxf";
+    link.click();
+}
+
+// Global Export Flags
+window.isExporting = false;
+window.exportedShapes = [];
+
+function startExport() {
+    if (shape_sel.value === 'Spectres') {
+        alert("Warning: 'Spectres' (Curvy) cannot be easily eroded for water jet. Please switch to 'Tile(1,1)' (Straight Edges) for best manufacturing results.");
+        return;
+    }
+
+    // 1. Setup Export Mode
+    window.isExporting = true;
+    window.exportedShapes = [];
+    
+    // 2. Run a render cycle to collect points (instead of drawing)
+    // We reset the view transform temporarily to Identity so we get raw coordinates
+    // scaled only by tileScale, not by screen pan/zoom.
+    const savedToScreen = [...to_screen];
+    to_screen = [20, 0, 0, 0, -20, 0]; // Reset to default view for export? 
+    // Actually, user might want "What they see". 
+    // Let's rely on the current transform but we need to realize 
+    // DXF 0,0 will be the center of the screen.
+    
+    ctx.save();
+    // Re-run the draw logic logic from draw() function manually
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.translate(width/2, height/2);
+    ctx.scale(tileScale, tileScale);
+    ctx.transform(to_screen[0], to_screen[3], to_screen[1], to_screen[4], to_screen[2], to_screen[5]);
+    
+    if(sys && sys[tile_sel.value]) {
+        sys[tile_sel.value].draw(ctx);
+    }
+    ctx.restore();
+    
+    // 3. Process Data
+    const rawShapes = window.exportedShapes;
+    const grout = parseFloat(groutInput.value);
+    const kerf = parseFloat(kerfInput.value);
+    
+    // Calculate erosion: We want a final gap of Grout. The tool cuts Kerf.
+    // We must offset each edge inwards by: (Grout - Kerf) / 2
+    // If Kerf > Grout (unlikely), this becomes negative (outset).
+    const erosion = (grout - kerf) / 2.0;
+    
+    console.log(`Exporting ${rawShapes.length} tiles. Erosion: ${erosion}`);
+
+    // 4. Apply Erosion
+    const cutShapes = rawShapes.map(pts => offsetPolygon(pts, -erosion)); // Negative for inward
+    
+    // 5. Optimize Path
+    const optimized = optimizeCutPath(cutShapes);
+    
+    // 6. Save
+    exportDXF(optimized);
+    
+    // 7. Cleanup
+    window.isExporting = false;
+    window.exportedShapes = [];
+    to_screen = savedToScreen; // Restore view
+    alert(`Exported ${optimized.length} tiles to DXF.`);
 }
