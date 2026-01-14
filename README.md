@@ -18,14 +18,22 @@ This application has been modernized with:
 
 - **TypeScript**: Full type safety for mathematical operations and shapes
 - **Vite**: Fast development server with HMR and optimized production builds
+- **Pixi.js**: Hardware-accelerated WebGL rendering for improved performance
 - **Modular ES6+**: Clean separation of concerns across multiple modules
-- **No External Dependencies**: Removed p5.js (~913 KB) for a lean bundle size
+
+### Rendering Engine
+
+The application uses **Pixi.js v8** for high-performance 2D rendering:
+- Hardware-accelerated WebGL rendering with automatic fallback to Canvas
+- Efficient viewport culling - only visible tiles are rendered
+- Retained mode graphics for smoother animations
+- High DPI display support with automatic scaling
 
 ### Bundle Size
 
-- **Before**: 957 KB (p5.js + app.js)
-- **After**: 15 KB (5.22 KB gzipped)
-- **Reduction**: 98.4% smaller! 🚀
+Bundle sizes are larger with Pixi.js but provide significant performance benefits:
+- **With Pixi.js**: ~234 KB (73 KB gzipped) - Hardware-accelerated rendering
+- **Previous Canvas**: 15 KB (5.22 KB gzipped) - Software rendering only
 
 ## Development
 
@@ -81,17 +89,23 @@ npm run preview
 ```
 spectre-app/
 ├── src/
-│   ├── types.ts         # TypeScript type definitions
-│   ├── math.ts          # Matrix and vector operations
-│   ├── renderer.ts      # Canvas drawing functions
-│   ├── shapes.ts        # Shape, CurvyShape, Meta classes
-│   ├── generator.ts     # Tiling and substitution logic
-│   ├── constants.ts     # Color maps and tile coordinates
-│   └── main.ts          # Application entry point
-├── index.html           # HTML entry point
-├── vite.config.ts       # Vite configuration
-├── tsconfig.json        # TypeScript configuration
-└── package.json         # Dependencies and scripts
+│   ├── types.ts           # TypeScript type definitions
+│   ├── math.ts            # Matrix and vector operations
+│   ├── renderer.ts        # Canvas drawing functions (legacy)
+│   ├── shapes.ts          # Canvas-based Shape classes (legacy)
+│   ├── pixiRenderer.ts    # Pixi.js renderer
+│   ├── pixiShapes.ts      # Pixi.js-based Shape classes
+│   ├── generator.ts       # Canvas tiling and substitution logic (legacy)
+│   ├── generatorPixi.ts   # Pixi.js tiling and substitution logic
+│   ├── constants.ts       # Color maps and tile coordinates
+│   ├── main.ts            # Canvas application entry (legacy)
+│   └── mainPixi.ts        # Pixi.js application entry (active)
+├── index.html             # HTML entry point
+├── vite.config.ts         # Vite configuration
+├── tsconfig.json          # TypeScript configuration
+├── app.test.js            # Canvas-based unit tests (88 tests)
+├── pixi.test.js           # Pixi.js unit tests (60 tests)
+└── package.json           # Dependencies and scripts
 ```
 
 ## Code Quality
@@ -107,7 +121,7 @@ The codebase follows modern TypeScript best practices:
 
 ## Testing
 
-The project includes a comprehensive unit test suite for the mathematical rendering functions based on the original paper "A Chiral Aperiodic Monotile" (2305.17743v2.pdf).
+The project includes a comprehensive unit test suite with **148 tests** across two test files.
 
 ### Running Tests
 
@@ -118,8 +132,7 @@ npm test
 
 ### Test Coverage
 
-The test suite includes **88 tests** organized into 11 suites:
-
+**Canvas-based tests (app.test.js)** - 88 tests organized into 11 suites:
 - Point operations (5 tests)
 - Affine matrix operations (20 tests)
 - Spectre tile geometry (8 tests)
@@ -132,6 +145,12 @@ The test suite includes **88 tests** organized into 11 suites:
 - Edge cases and boundary conditions (5 tests)
 - Tile counting and bounding box (11 tests)
 - Syntax validation (1 test)
+
+**Pixi.js tests (pixi.test.js)** - 60 tests organized into 4 suites:
+- Pixi.js Shape Classes (19 tests)
+- Pixi.js Generator Functions (5 tests)
+- Pixi.js Performance Optimizations (2 tests)
+- Integration tests for Matrix, Graphics, Container (34 tests)
 
 See [TEST_DOCUMENTATION.md](TEST_DOCUMENTATION.md) for detailed information about the test suite.
 
