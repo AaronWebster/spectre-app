@@ -304,11 +304,13 @@ function updateUIVisibility(): void {
 
   // Show/hide folders based on mode
   const allFolders = pane.children;
-  allFolders.forEach((child: any) => {
-    if (child.title === 'Explorer') {
-      child.hidden = fabricationMode;
-    } else if (child.title === 'Fabrication') {
-      child.hidden = !fabricationMode;
+  allFolders.forEach((child) => {
+    if ('title' in child) {
+      if (child.title === 'Explorer') {
+        child.hidden = fabricationMode;
+      } else if (child.title === 'Fabrication') {
+        child.hidden = !fabricationMode;
+      }
     }
   });
 }
