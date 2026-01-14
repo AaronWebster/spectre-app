@@ -16,9 +16,16 @@ let needsRedraw = true;
 
 // Tile counter
 let tileCount = 0;
+let visibleTileCount = 0;
+
+// Tile scale and bounding box
+let tileScale = 1;
+let boundingBoxWidth = 100;
+let boundingBoxHeight = 100;
 
 // UI Elements
 let tile_sel, shape_sel, colscheme_sel, tile_count_label;
+let tileScaleInput, boundingBoxWidthInput, boundingBoxHeightInput;
 
 const tile_names = [ 
 	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
@@ -121,6 +128,42 @@ function matchTwo( p1, q1, p2, q2 ) {
 	return mul( matchSeg( p2, q2 ), inv( matchSeg( p1, q1 ) ) );
 };
 
+// Check if a tile is fully outside the bounding box
+// Returns true if the tile should be invisible
+function isTileOutsideBounds(pts, ctx) {
+	// Get the current transformation matrix from the context
+	// This includes: center translation + tileScale + to_screen
+	const transform = ctx.getTransform();
+	
+	// Calculate the bounding box of the tile in screen space
+	let minX = Infinity, maxX = -Infinity;
+	let minY = Infinity, maxY = -Infinity;
+	
+	for (const p of pts) {
+		// Transform the point to screen coordinates
+		const x = transform.a * p.x + transform.c * p.y + transform.e;
+		const y = transform.b * p.x + transform.d * p.y + transform.f;
+		
+		minX = Math.min(minX, x);
+		maxX = Math.max(maxX, x);
+		minY = Math.min(minY, y);
+		maxY = Math.max(maxY, y);
+	}
+	
+	// Get the scale factor from the transform
+	const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+	const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
+	
+	// Convert bounding box dimensions to screen space
+	// The bounding box is specified in tile units, so we scale by the transformation scale
+	const halfWidth = (boundingBoxWidth / 2) * scaleX;
+	const halfHeight = (boundingBoxHeight / 2) * scaleY;
+	
+	// Tile is outside if its bounding box doesn't overlap with the viewing box
+	return (maxX < -halfWidth || minX > halfWidth || 
+	        maxY < -halfHeight || minY > halfHeight);
+};
+
 // Drawing Helpers
 function drawPolygon( ctx, shape, f, s, w ) {
     ctx.beginPath();
@@ -150,7 +193,13 @@ class Shape {
 	}
 
 	draw(ctx) {
-		drawPolygon( ctx, this.pts, colmap[this.label], [0,0,0], 0.1 );
+		const isOutside = isTileOutsideBounds(this.pts, ctx);
+		if (!isOutside) {
+			// Only draw if tile is inside bounds
+			drawPolygon( ctx, this.pts, colmap[this.label], [0,0,0], 0.1 );
+			visibleTileCount++;
+		}
+		// Always count the tile even if not visible
 		tileCount++;
 	}
 
@@ -191,23 +240,29 @@ class CurvyShape {
 	}
 
 	draw(ctx) {
-        const col = colmap[this.label];
-		ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-		ctx.strokeStyle = "rgb(0,0,0)";
-        ctx.lineWidth = 0.1;
+		const isOutside = isTileOutsideBounds(this.pts, ctx);
+		if (!isOutside) {
+			// Only draw if tile is inside bounds
+			const col = colmap[this.label];
+			ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+			ctx.strokeStyle = "rgb(0,0,0)";
+			ctx.lineWidth = 0.1;
 
-		ctx.beginPath();
-		ctx.moveTo( this.pts[0].x, this.pts[0].y );
+			ctx.beginPath();
+			ctx.moveTo( this.pts[0].x, this.pts[0].y );
 
-		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
-			const a = this.pts[idx];
-			const b = this.pts[idx+1];
-			const c = this.pts[idx+2];
-			ctx.bezierCurveTo( a.x, a.y, b.x, b.y, c.x, c.y );
+			for( let idx = 1; idx < this.pts.length; idx += 3 ) {
+				const a = this.pts[idx];
+				const b = this.pts[idx+1];
+				const c = this.pts[idx+2];
+				ctx.bezierCurveTo( a.x, a.y, b.x, b.y, c.x, c.y );
+			}
+			ctx.closePath();
+			ctx.fill();
+			ctx.stroke();
+			visibleTileCount++;
 		}
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+		// Always count the tile even if not visible
 		tileCount++;
 	}
 
@@ -534,6 +589,26 @@ function createUI() {
     
     // Tile Count Label
     tile_count_label = addLabel('Tiles: 0', 10, 270);
+    
+    // Tile Scale
+    addLabel('Tile Scale', 10, 300);
+    tileScaleInput = addNumberInput(10, 320, tileScale, 0.1, 10, 0.1, (value) => {
+        tileScale = value;
+        needsRedraw = true;
+    });
+    
+    // Bounding Box
+    addLabel('Bounding Box', 10, 350);
+    addLabel('Width:', 10, 370);
+    boundingBoxWidthInput = addNumberInput(70, 367, boundingBoxWidth, 10, 1000, 10, (value) => {
+        boundingBoxWidth = value;
+        needsRedraw = true;
+    });
+    addLabel('Height:', 10, 395);
+    boundingBoxHeightInput = addNumberInput(70, 392, boundingBoxHeight, 10, 1000, 10, (value) => {
+        boundingBoxHeight = value;
+        needsRedraw = true;
+    });
 }
 
 function addLabel(text, x, y) {
@@ -575,6 +650,28 @@ function addButton(text, x, y, onclick) {
     el.style.width = '125px';
     el.style.height = '25px';
     el.addEventListener('click', onclick);
+    document.body.appendChild(el);
+    return el;
+}
+
+function addNumberInput(x, y, defaultValue, min, max, step, onchange) {
+    const el = document.createElement('input');
+    el.type = 'number';
+    el.value = defaultValue;
+    el.min = min;
+    el.max = max;
+    el.step = step;
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.width = '60px';
+    el.style.height = '20px';
+    el.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        if (!isNaN(value)) {
+            onchange(value);
+        }
+    });
     document.body.appendChild(el);
     return el;
 }
@@ -718,8 +815,9 @@ function onTouchEnd(e) {
 
 // ... Draw ...
 function draw() {
-    // Reset tile counter
+    // Reset tile counters
     tileCount = 0;
+    visibleTileCount = 0;
     
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -729,6 +827,8 @@ function draw() {
     ctx.save();
     // Center logic
     ctx.translate(width/2, height/2);
+    // Apply tile scale
+    ctx.scale(tileScale, tileScale);
     // Apply to_screen
     ctx.transform(to_screen[0], to_screen[3], to_screen[1], to_screen[4], to_screen[2], to_screen[5]);
 
@@ -755,12 +855,12 @@ function draw() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 0.5;
-        ctx.fillRect(5, 5, 135, 275); // Adjusted height for fewer buttons
-        ctx.strokeRect(5, 5, 135, 275);
+        ctx.fillRect(5, 5, 135, 420); // Updated height for new UI elements
+        ctx.strokeRect(5, 5, 135, 420);
     }
     
     // Update tile count display
     if(tile_count_label) {
-        tile_count_label.innerText = `Tiles: ${tileCount}`;
+        tile_count_label.innerText = `Tiles: ${visibleTileCount}`;
     }
 }
