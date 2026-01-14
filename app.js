@@ -4,6 +4,24 @@
 const DEFAULT_SCALE = 20;
 const PARALLEL_LINE_TOLERANCE = 1e-8;
 
+// Base Spectre tile coordinates (unit size)
+const SPECTRE_COORDS = [
+    {x: 0, y: 0},
+    {x: 1.0, y: 0.0},
+    {x: 1.5, y: -0.8660254037844386},
+    {x: 2.366025403784439, y: -0.36602540378443865},
+    {x: 2.366025403784439, y: 0.6339745962155614},
+    {x: 3.366025403784439, y: 0.6339745962155614},
+    {x: 3.866025403784439, y: 1.5},
+    {x: 3.0, y: 2.0},
+    {x: 2.133974596215561, y: 1.5},
+    {x: 1.6339745962155614, y: 2.3660254037844393},
+    {x: 0.6339745962155614, y: 2.3660254037844393},
+    {x: -0.3660254037844386, y: 2.3660254037844393},
+    {x: -0.866025403784439, y: 1.5},
+    {x: 0.0, y: 1.0}
+];
+
 const ident = [1,0,0,0,1,0];
 let to_screen = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0];
 let lw_scale = 1;
@@ -344,22 +362,8 @@ class Meta {
 // Builders
 function buildSpectreBase( curved )
 {
-	const spectre = [
-		pt(0, 0),
-		pt(1.0, 0.0),
-		pt(1.5, -0.8660254037844386),
-		pt(2.366025403784439, -0.36602540378443865),
-		pt(2.366025403784439, 0.6339745962155614),
-		pt(3.366025403784439, 0.6339745962155614),
-		pt(3.866025403784439, 1.5),
-		pt(3.0, 2.0),
-		pt(2.133974596215561, 1.5),
-		pt(1.6339745962155614, 2.3660254037844393),
-		pt(0.6339745962155614, 2.3660254037844393),
-		pt(-0.3660254037844386, 2.3660254037844393),
-		pt(-0.866025403784439, 1.5),
-		pt(0.0, 1.0) 
-	];
+	// Use the constant for spectre coordinates
+	const spectre = SPECTRE_COORDS.map(p => pt(p.x, p.y));
 
 	const spectre_keys = [
 		spectre[3], spectre[5], spectre[7], spectre[11]
@@ -774,8 +778,8 @@ function toggleUIVisibility() {
             const text = label.innerText;
             if (text.includes('Shapes') || text.includes('Category') || 
                 text.includes('Colours') || text.includes('Tile Scale') || 
-                text.includes('Bounding Box') || text.includes('W:') && label.style.top === '420px' ||
-                text.includes('H:') && label.style.top === '420px' ||
+                text.includes('Bounding Box') || (text.includes('W:') && label.style.top === '420px') ||
+                (text.includes('H:') && label.style.top === '420px') ||
                 text.includes('--- Explorer ---')) {
                 label.style.display = 'none';
             } else if (text.includes('--- Fabrication ---') || text.includes('Stock') ||
@@ -783,6 +787,7 @@ function toggleUIVisibility() {
                       text.includes('Grout') || text.includes('Kerf') || 
                       text.includes('Chain Cut') || text.includes('Yield')) {
                 label.style.display = '';
+            }
             }
         });
         
@@ -817,26 +822,8 @@ function toggleUIVisibility() {
 
 // Nesting Logic for Fabrication Mode
 function nestTiles() {
-    // Get the base Delta tile (using straight edges)
-    const baseTile = sys['Delta'];
-    
-    // Get the base spectre coordinates
-    const spectre = [
-        pt(0, 0),
-        pt(1.0, 0.0),
-        pt(1.5, -0.8660254037844386),
-        pt(2.366025403784439, -0.36602540378443865),
-        pt(2.366025403784439, 0.6339745962155614),
-        pt(3.366025403784439, 0.6339745962155614),
-        pt(3.866025403784439, 1.5),
-        pt(3.0, 2.0),
-        pt(2.133974596215561, 1.5),
-        pt(1.6339745962155614, 2.3660254037844393),
-        pt(0.6339745962155614, 2.3660254037844393),
-        pt(-0.3660254037844386, 2.3660254037844393),
-        pt(-0.866025403784439, 1.5),
-        pt(0.0, 1.0) 
-    ];
+    // Use the base spectre coordinates constant
+    const spectre = SPECTRE_COORDS;
     
     // Scale the tile by tileScale
     const scaledTile = spectre.map(p => pt(p.x * tileScale, p.y * tileScale));
@@ -875,9 +862,9 @@ function nestTiles() {
     nestedShapes = [];
     for (let row = 0; row < tilesY; row++) {
         for (let col = 0; col < tilesX; col++) {
-            // Calculate position (centered in stock)
-            const offsetX = stockMargin + col * tileWidth + tileWidth / 2 - minX - maxX / 2;
-            const offsetY = stockMargin + row * tileHeight + tileHeight / 2 - minY - maxY / 2;
+            // Calculate position (starting from margin, placing tiles in a grid)
+            const offsetX = stockMargin + col * tileWidth - minX;
+            const offsetY = stockMargin + row * tileHeight - minY;
             
             // Translate tile
             const translatedTile = erodedTile.map(p => pt(p.x + offsetX, p.y + offsetY));
