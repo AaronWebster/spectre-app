@@ -154,7 +154,12 @@ export function buildHexBase(): Record<string, PixiShape> {
 }
 
 /**
- * Build supertiles using substitution rules with Pixi.js shapes
+ * Build supertiles using substitution rules
+ * 
+ * Performance Note: This function is computationally expensive and called recursively
+ * for high tile counts. Matrix operations now use gl-matrix for optimization.
+ * Future optimization: Could be moved to a Web Worker, but would require refactoring
+ * to serialize/deserialize shape objects. See PERFORMANCE_OPTIMIZATIONS.md for details.
  */
 export function buildSupertiles(
   sys: Record<string, PixiShape | PixiCurvyShape | PixiMeta>
