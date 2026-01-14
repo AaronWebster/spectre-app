@@ -370,9 +370,20 @@ function exportSVG(): void {
 function drawTilesToPixi(
   container: PIXI.Container,
   tile: PixiShape | PixiCurvyShape | PixiMeta,
+  currentTransform: PIXI.Matrix, // NEW: pass transform explicitly
   counters: { total: number; visible: number }
 ): void {
-  tile.draw(container, colmap, boundingBoxWidth, boundingBoxHeight, width, height, counters);
+  // Pass the transform down
+  tile.draw(
+    container, 
+    currentTransform, 
+    colmap, 
+    boundingBoxWidth, 
+    boundingBoxHeight, 
+    width, 
+    height, 
+    counters
+  );
 }
 
 /**
@@ -427,7 +438,8 @@ function draw(): void {
   mainContainer.setFromMatrix(matrix);
 
   // Draw the pattern directly into main container
-  drawTilesToPixi(mainContainer, curr_sys['Gamma'], counters);
+  // Pass 'matrix' as the currentTransform
+  drawTilesToPixi(mainContainer, curr_sys['Gamma'], matrix, counters);
 
   // Update tile count in UI state
   tileCount = counters.total;
