@@ -162,7 +162,7 @@ export function exportToDXF(
 /**
  * Download a string as a file in the browser
  */
-export function downloadFile(content: string, filename: string, mimeType: string = 'application/dxf'): void {
+export function downloadFile(content: string, filename: string, mimeType: string = 'application/octet-stream'): void {
   const blob = new Blob([content], { type: mimeType });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -187,7 +187,7 @@ export function exportFabricationDXF(
     units
   });
   
-  downloadFile(dxfContent, 'spectre_fabrication.dxf', 'application/dxf');
+  downloadFile(dxfContent, 'spectre_fabrication.dxf', 'application/octet-stream');
 }
 
 /**
@@ -202,5 +202,5 @@ export function exportOptimizedDXF(
     units
   });
   
-  downloadFile(dxfContent, 'spectre_cut_optimized.dxf', 'application/dxf');
+  downloadFile(dxfContent, 'spectre_cut_optimized.dxf', 'application/octet-stream');
 }

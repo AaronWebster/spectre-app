@@ -69,6 +69,7 @@ const uiState = {
   stockHeight: 24,
   stockMargin: 0.25,
   chainCutting: false,
+  units: 'Inches',
   yield: '0%'
 };
 
@@ -277,6 +278,14 @@ function createUI(): void {
     step: 0.25,
   }).on('change', (ev) => {
     stockMargin = ev.value;
+  });
+
+  fabricationFolder.addBinding(uiState, 'units', {
+    label: 'Units',
+    options: {
+      Inches: 'Inches',
+      Millimeters: 'Millimeters'
+    }
   });
 
   fabricationFolder.addBinding(uiState, 'chainCutting', {
@@ -583,11 +592,11 @@ async function nestTiles(): Promise<void> {
   const scaledTile: Point[] = spectre.map(p => ({ x: p.x * tileScale, y: p.y * tileScale }));
 
   // Get grout and kerf values
-  const grout = uiState.grout;
-  const kerf = uiState.kerf;
+  const groutValue = uiState.grout;
+  const kerfValue = uiState.kerf;
 
   // Calculate erosion: (Grout - Kerf) / 2
-  const erosion = (grout - kerf) / 2.0;
+  const erosion = (groutValue - kerfValue) / 2.0;
 
   try {
     // Apply erosion (negative for inward offset) using robust clipper library
@@ -654,8 +663,8 @@ function exportFabDXF(): void {
   }
 
   try {
-    exportFabricationDXF(nestedShapes, stockWidth, stockHeight, 'Inches');
-    alert(`Exported ${fabYield} tiles to DXF with stock dimensions ${stockWidth}x${stockHeight} inches.`);
+    exportFabricationDXF(nestedShapes, stockWidth, stockHeight, uiState.units as 'Inches' | 'Millimeters');
+    alert(`Exported ${fabYield} tiles to DXF with stock dimensions ${stockWidth}x${stockHeight} ${uiState.units.toLowerCase()}.`);
   } catch (error) {
     console.error('Error exporting DXF:', error);
     alert('Error exporting DXF. Please check console for details.');
