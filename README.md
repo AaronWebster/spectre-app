@@ -80,6 +80,39 @@ Preview the production build locally:
 npm run preview
 ```
 
+## Deployment
+
+The application can be deployed to any static hosting service. The build process creates a fully self-contained `dist/` directory with all necessary files.
+
+### Deployment Steps
+
+1. **Build for production:**
+   ```bash
+   npm run build
+   ```
+
+2. **Deploy the `dist/` directory** to your hosting service of choice:
+   - **GitHub Pages**: Push the `dist/` directory to a `gh-pages` branch
+   - **Netlify**: Drag and drop the `dist/` folder or connect to your repository
+   - **Vercel**: Connect to your repository or use the Vercel CLI
+   - **Cloudflare Pages**: Connect to your repository or upload the `dist/` folder
+   - **Any static host**: Upload the contents of `dist/` to your web server
+
+### GitHub Pages Deployment Example
+
+```bash
+# Build the app
+npm run build
+
+# Deploy to GitHub Pages (using gh-pages package)
+npm install -g gh-pages
+gh-pages -d dist
+```
+
+### Custom Domain
+
+If using a custom domain, configure your DNS settings according to your hosting provider's documentation. For GitHub Pages, add a `CNAME` file to the `public/` directory before building.
+
 ## Usage
 
 ### Controls
@@ -96,22 +129,18 @@ spectre-app/
 ├── src/
 │   ├── types.ts           # TypeScript type definitions
 │   ├── math.ts            # Matrix and vector operations
-│   ├── renderer.ts        # Canvas drawing functions (legacy)
-│   ├── shapes.ts          # Canvas-based Shape classes (legacy)
 │   ├── pixiRenderer.ts    # Pixi.js renderer
 │   ├── pixiShapes.ts      # Pixi.js-based Shape classes
-│   ├── generator.ts       # Canvas tiling and substitution logic (legacy)
 │   ├── generatorPixi.ts   # Pixi.js tiling and substitution logic
 │   ├── constants.ts       # Color maps and tile coordinates
 │   ├── fabrication.ts     # Manufacturing/fabrication utilities
-│   ├── main.ts            # Canvas application entry (legacy)
-│   └── mainPixi.ts        # Pixi.js application entry (active)
+│   └── mainPixi.ts        # Application entry point
 ├── index.html             # HTML entry point
 ├── vite.config.ts         # Vite configuration
 ├── tsconfig.json          # TypeScript configuration
-├── app.test.js            # Canvas-based unit tests (88 tests)
-├── pixi.test.js           # Pixi.js unit tests (60 tests)
-├── fabrication.test.js    # Fabrication unit tests (7 tests)
+├── app.test.js            # Mathematical correctness tests (93 tests)
+├── pixi.test.js           # Pixi.js component tests (60 tests)
+├── fabrication.test.js    # Fabrication feature tests (7 tests)
 ├── FABRICATION.md         # Fabrication features documentation
 └── package.json           # Dependencies and scripts
 ```
@@ -129,7 +158,7 @@ The codebase follows modern TypeScript best practices:
 
 ## Testing
 
-The project includes a comprehensive unit test suite with **155 tests** across three test files.
+The project includes a comprehensive unit test suite with **160 tests** across three test files.
 
 ### Running Tests
 
@@ -140,7 +169,7 @@ npm test
 
 ### Test Coverage
 
-**Canvas-based tests (app.test.js)** - 88 tests organized into 11 suites:
+**Mathematical correctness tests (app.test.js)** - 93 tests organized into 11 suites:
 - Point operations (5 tests)
 - Affine matrix operations (20 tests)
 - Spectre tile geometry (8 tests)
@@ -152,7 +181,7 @@ npm test
 - Tile substitution rules (2 tests)
 - Edge cases and boundary conditions (5 tests)
 - Tile counting and bounding box (11 tests)
-- Syntax validation (1 test)
+- Matrix operations reference consistency (16 tests)
 
 **Pixi.js tests (pixi.test.js)** - 60 tests organized into 4 suites:
 - Pixi.js Shape Classes (19 tests)
@@ -164,7 +193,6 @@ npm test
 - Polygon offsetting with js-angusj-clipper (3 tests)
 - DXF export with dxf-writer (3 tests)
 - Integration tests for offset and export (1 test)
-- Integration tests for Matrix, Graphics, Container (34 tests)
 
 See [TEST_DOCUMENTATION.md](TEST_DOCUMENTATION.md) for detailed information about the test suite.
 
