@@ -14,20 +14,6 @@
 
 const fs = require('fs');
 
-// Mock console to suppress output during tests
-const originalLog = console.log;
-const originalStdoutWrite = process.stdout.write;
-
-function mockConsole() {
-    console.log = jest.fn();
-    process.stdout.write = jest.fn();
-}
-
-function restoreConsole() {
-    console.log = originalLog;
-    process.stdout.write = originalStdoutWrite;
-}
-
 // Helper functions for tests
 function approxEqual(a, b, epsilon = 1e-8) {
     return Math.abs(a - b) < epsilon;
@@ -35,6 +21,10 @@ function approxEqual(a, b, epsilon = 1e-8) {
 
 function pointsEqual(p1, p2, epsilon = 1e-8) {
     return approxEqual(p1.x, p2.x, epsilon) && approxEqual(p1.y, p2.y, epsilon);
+}
+
+function pt(x, y) {
+    return { x: x, y: y };
 }
 
 // Mock p5.js environment
@@ -93,24 +83,21 @@ describe('Run Spectre - Environment Setup', () => {
     });
 });
 
+// Shared helper function for polygon area calculation
+function polyArea(pts) {
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+        let j = (i + 1) % pts.length;
+        area += pts[i].x * pts[j].y;
+        area -= pts[j].x * pts[i].y;
+    }
+    return Math.abs(area) / 2;
+}
+
 describe('Run Spectre - Polygon Area Calculation', () => {
     beforeEach(() => {
         createMockEnvironment();
     });
-
-    function polyArea(pts) {
-        let area = 0;
-        for (let i = 0; i < pts.length; i++) {
-            let j = (i + 1) % pts.length;
-            area += pts[i].x * pts[j].y;
-            area -= pts[j].x * pts[i].y;
-        }
-        return Math.abs(area) / 2;
-    }
-
-    function pt(x, y) {
-        return { x: x, y: y };
-    }
 
     test('polyArea() calculates unit square area correctly', () => {
         const square = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
@@ -144,10 +131,6 @@ describe('Run Spectre - Polygon Area Calculation', () => {
 });
 
 describe('Run Spectre - Centroid Calculation', () => {
-    function pt(x, y) {
-        return { x: x, y: y };
-    }
-
     test('Centroid of unit square is at (0.5, 0.5)', () => {
         const points = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
         let sumX = 0, sumY = 0;
@@ -192,10 +175,6 @@ describe('Run Spectre - Centroid Calculation', () => {
 });
 
 describe('Run Spectre - Cropping Logic', () => {
-    function pt(x, y) {
-        return { x: x, y: y };
-    }
-
     test('Point inside crop bounds passes filter', () => {
         const cx = 0, cy = 0;
         const width = 10, height = 10;
@@ -472,10 +451,6 @@ describe('Run Spectre - SVG Generation', () => {
 });
 
 describe('Run Spectre - Bounds Calculation', () => {
-    function pt(x, y) {
-        return { x: x, y: y };
-    }
-
     test('Bounds of unit square', () => {
         const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
         
@@ -645,10 +620,6 @@ describe('Run Spectre - File Operations', () => {
 });
 
 describe('Run Spectre - Shape Filtering', () => {
-    function pt(x, y) {
-        return { x: x, y: y };
-    }
-
     test('Filter keeps shapes with centroids inside bounds', () => {
         const shapes = [
             { pts: [pt(0, 0), pt(1, 0), pt(1, 1)] },
@@ -755,10 +726,6 @@ describe('Run Spectre - Edge Cases', () => {
     });
 
     test('Negative coordinates work in bounds calculation', () => {
-        function pt(x, y) {
-            return { x: x, y: y };
-        }
-        
         const pts = [pt(-5, -5), pt(-4, -5), pt(-4, -4), pt(-5, -4)];
         
         let minX = Infinity, maxX = -Infinity;

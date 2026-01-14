@@ -67,6 +67,8 @@ global.pmouseY = 0;
 global.dist = (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 
 // Load spectre.cjs and make its variables globally accessible
+// Note: eval() is necessary here because spectre.cjs is designed for browser
+// environment and not as a CommonJS module. The code is from the same repository.
 let spectreCode = fs.readFileSync(__dirname + '/spectre.cjs', 'utf8');
 // Replace const/let with var to ensure global visibility
 spectreCode = spectreCode
@@ -75,16 +77,21 @@ spectreCode = spectreCode
     .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
 eval(spectreCode);
 
+// Test constants
+const EPSILON = 1e-8;
+const EPSILON_DISTANCE = 1e-6;
+const EPSILON_ANGLE = 0.1; // In degrees, for angle comparisons
+
 // Helper functions for tests
-function approxEqual(a, b, epsilon = 1e-8) {
+function approxEqual(a, b, epsilon = EPSILON) {
     return Math.abs(a - b) < epsilon;
 }
 
-function pointsEqual(p1, p2, epsilon = 1e-8) {
+function pointsEqual(p1, p2, epsilon = EPSILON) {
     return approxEqual(p1.x, p2.x, epsilon) && approxEqual(p1.y, p2.y, epsilon);
 }
 
-function matricesEqual(M1, M2, epsilon = 1e-8) {
+function matricesEqual(M1, M2, epsilon = EPSILON) {
     return M1.every((val, idx) => approxEqual(val, M2[idx], epsilon));
 }
 
@@ -319,7 +326,7 @@ describe('Standalone Spectre Tile Geometry', () => {
             const p1 = spectre[i];
             const p2 = spectre[(i + 1) % spectre.length];
             const dist = distance(p1, p2);
-            expect(approxEqual(dist, 1.0, 1e-6)).toBe(true);
+            expect(approxEqual(dist, 1.0, EPSILON_DISTANCE)).toBe(true);
         }
     });
 });
@@ -380,7 +387,7 @@ describe('Standalone Hexagon Tile Geometry', () => {
             const p1 = hex[i];
             const p2 = hex[(i + 1) % hex.length];
             const dist = distance(p1, p2);
-            expect(approxEqual(dist, 1.0, 1e-6)).toBe(true);
+            expect(approxEqual(dist, 1.0, EPSILON_DISTANCE)).toBe(true);
         }
     });
 
@@ -394,7 +401,7 @@ describe('Standalone Hexagon Tile Geometry', () => {
             const ang = angle(prev, curr, next);
             const degrees = ang * 180 / Math.PI;
             
-            expect(approxEqual(degrees, 120, 1.0)).toBe(true);
+            expect(approxEqual(degrees, 120, EPSILON_ANGLE)).toBe(true);
         }
     });
 });
