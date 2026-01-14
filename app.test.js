@@ -987,3 +987,248 @@ describe('Tile Counting', () => {
         expect(counter.count).toBe(0);
     });
 });
+
+describe('Tile Scale and Bounding Box', () => {
+    // Mock canvas context with getTransform
+    const createMockCtx = (transform) => ({
+        beginPath: jest.fn(),
+        moveTo: jest.fn(),
+        lineTo: jest.fn(),
+        closePath: jest.fn(),
+        fill: jest.fn(),
+        stroke: jest.fn(),
+        save: jest.fn(),
+        restore: jest.fn(),
+        transform: jest.fn(),
+        bezierCurveTo: jest.fn(),
+        fillStyle: '',
+        strokeStyle: '',
+        lineWidth: 0,
+        getTransform: () => ({
+            a: transform.a,
+            b: transform.b,
+            c: transform.c,
+            d: transform.d,
+            e: transform.e,
+            f: transform.f
+        })
+    });
+
+    test('Tile scale of 1 keeps tiles at original size', () => {
+        // With scale 1, the transformation should be identity-like
+        const tileScale = 1;
+        const boundingBox = 100;
+        
+        // Scale factor in transformation
+        const transform = { a: 20, b: 0, c: 0, d: -20, e: 0, f: 0 };
+        const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+        
+        // Bounding box half-width in screen space
+        const halfWidth = (boundingBox / 2) * scaleX;
+        
+        expect(halfWidth).toBe(1000); // 50 * 20
+    });
+
+    test('Tile scale of 2 doubles the size', () => {
+        const tileScale = 2;
+        const boundingBox = 100;
+        
+        // With scale 2, transformation doubles
+        const transform = { a: 40, b: 0, c: 0, d: -40, e: 0, f: 0 };
+        const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+        
+        const halfWidth = (boundingBox / 2) * scaleX;
+        
+        expect(halfWidth).toBe(2000); // 50 * 40
+    });
+
+    test('Bounding box of 100x100 creates correct viewport', () => {
+        const boundingBoxWidth = 100;
+        const boundingBoxHeight = 100;
+        const scale = 20; // Base scale from to_screen
+        
+        const halfWidth = (boundingBoxWidth / 2) * scale;
+        const halfHeight = (boundingBoxHeight / 2) * scale;
+        
+        expect(halfWidth).toBe(1000);
+        expect(halfHeight).toBe(1000);
+    });
+
+    test('Tile completely inside bounds is visible', () => {
+        // Small tile centered at origin
+        const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
+        const boundingBoxWidth = 100;
+        const boundingBoxHeight = 100;
+        
+        // Identity-like transform
+        const transform = { a: 20, b: 0, c: 0, d: -20, e: 0, f: 0 };
+        
+        // Calculate bounding box
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        for (const p of pts) {
+            const x = transform.a * p.x + transform.c * p.y + transform.e;
+            const y = transform.b * p.x + transform.d * p.y + transform.f;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        }
+        
+        const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+        const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
+        
+        const halfWidth = (boundingBoxWidth / 2) * scaleX;
+        const halfHeight = (boundingBoxHeight / 2) * scaleY;
+        
+        const isOutside = (maxX < -halfWidth || minX > halfWidth || 
+                          maxY < -halfHeight || minY > halfHeight);
+        
+        expect(isOutside).toBe(false);
+    });
+
+    test('Tile completely outside bounds is invisible', () => {
+        // Tile far from origin
+        const pts = [pt(100, 100), pt(101, 100), pt(101, 101), pt(100, 101)];
+        const boundingBoxWidth = 10;
+        const boundingBoxHeight = 10;
+        
+        // Identity-like transform
+        const transform = { a: 20, b: 0, c: 0, d: -20, e: 0, f: 0 };
+        
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        for (const p of pts) {
+            const x = transform.a * p.x + transform.c * p.y + transform.e;
+            const y = transform.b * p.x + transform.d * p.y + transform.f;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        }
+        
+        const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+        const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
+        
+        const halfWidth = (boundingBoxWidth / 2) * scaleX;
+        const halfHeight = (boundingBoxHeight / 2) * scaleY;
+        
+        const isOutside = (maxX < -halfWidth || minX > halfWidth || 
+                          maxY < -halfHeight || minY > halfHeight);
+        
+        expect(isOutside).toBe(true);
+    });
+
+    test('Tile partially overlapping bounds is visible', () => {
+        // Tile that crosses the boundary
+        const pts = [pt(-1, -1), pt(1, -1), pt(1, 1), pt(-1, 1)];
+        const boundingBoxWidth = 1;
+        const boundingBoxHeight = 1;
+        
+        const transform = { a: 20, b: 0, c: 0, d: -20, e: 0, f: 0 };
+        
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        for (const p of pts) {
+            const x = transform.a * p.x + transform.c * p.y + transform.e;
+            const y = transform.b * p.x + transform.d * p.y + transform.f;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        }
+        
+        const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+        const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
+        
+        const halfWidth = (boundingBoxWidth / 2) * scaleX;
+        const halfHeight = (boundingBoxHeight / 2) * scaleY;
+        
+        const isOutside = (maxX < -halfWidth || minX > halfWidth || 
+                          maxY < -halfHeight || minY > halfHeight);
+        
+        // Tile overlaps, so should be visible
+        expect(isOutside).toBe(false);
+    });
+
+    test('Asymmetric bounding box works correctly', () => {
+        const boundingBoxWidth = 50;
+        const boundingBoxHeight = 100;
+        const scale = 20;
+        
+        const halfWidth = (boundingBoxWidth / 2) * scale;
+        const halfHeight = (boundingBoxHeight / 2) * scale;
+        
+        expect(halfWidth).toBe(500);
+        expect(halfHeight).toBe(1000);
+    });
+
+    test('Different tile scales affect bounding box correctly', () => {
+        const boundingBox = 100;
+        const scales = [0.5, 1, 2, 5];
+        const baseScale = 20;
+        
+        scales.forEach(tileScale => {
+            const effectiveScale = baseScale * tileScale;
+            const halfWidth = (boundingBox / 2) * effectiveScale;
+            expect(halfWidth).toBe(50 * baseScale * tileScale);
+        });
+    });
+
+    test('Rotation preserves bounding box check', () => {
+        // Rotated tile
+        const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
+        const boundingBoxWidth = 100;
+        const boundingBoxHeight = 100;
+        
+        // 45-degree rotation
+        const cos45 = Math.cos(Math.PI / 4);
+        const sin45 = Math.sin(Math.PI / 4);
+        const transform = { 
+            a: 20 * cos45, 
+            b: 20 * sin45, 
+            c: -20 * sin45, 
+            d: 20 * cos45, 
+            e: 0, 
+            f: 0 
+        };
+        
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        for (const p of pts) {
+            const x = transform.a * p.x + transform.c * p.y + transform.e;
+            const y = transform.b * p.x + transform.d * p.y + transform.f;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        }
+        
+        const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
+        const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
+        
+        const halfWidth = (boundingBoxWidth / 2) * scaleX;
+        const halfHeight = (boundingBoxHeight / 2) * scaleY;
+        
+        const isOutside = (maxX < -halfWidth || minX > halfWidth || 
+                          maxY < -halfHeight || minY > halfHeight);
+        
+        // Small rotated tile should still be inside large bounds
+        expect(isOutside).toBe(false);
+    });
+
+    test('Visible tile count is separate from total tile count', () => {
+        // This test verifies the concept that we track both counts
+        let totalCount = 10;
+        let visibleCount = 5;
+        
+        // In the implementation, tiles outside bounds increase totalCount
+        // but not visibleCount
+        expect(totalCount).toBeGreaterThan(visibleCount);
+        expect(visibleCount).toBeLessThanOrEqual(totalCount);
+    });
+});

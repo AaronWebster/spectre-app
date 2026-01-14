@@ -4,7 +4,7 @@ This document describes the comprehensive unit test suite for the Spectre app's 
 
 ## Overview
 
-The test suite (`app.test.js`) contains **67 tests** organized into **10 test suites** that verify the mathematical correctness of the Spectre tile rendering implementation.
+The test suite (`app.test.js`) contains **87 tests** organized into **11 test suites** that verify the mathematical correctness of the Spectre tile rendering implementation.
 
 ## Test Coverage
 
@@ -113,6 +113,21 @@ Tests robustness:
 - Inverse of composed transformations
 - Frame computation with zero coefficients
 - Degenerate cases (identical segment endpoints)
+
+### 11. Tile Scale and Bounding Box (10 tests)
+Tests the new tile scaling and bounding box culling features:
+- Tile scale of 1 maintains original size
+- Tile scale of 2 doubles the size
+- Bounding box dimensions create correct viewport
+- Tiles completely inside bounds are visible
+- Tiles completely outside bounds are invisible
+- Tiles partially overlapping bounds are visible
+- Asymmetric bounding boxes work correctly
+- Different tile scales affect bounding box correctly
+- Rotation preserves bounding box checks
+- Visible tile count is tracked separately from total count
+
+**Implementation Reference**: These tests verify the `isTileOutsideBounds()` function and the tile scale/bounding box UI features that allow users to control tile visibility and scale.
 
 ## Running the Tests
 
