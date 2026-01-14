@@ -2,16 +2,17 @@
   "name": "spectre-app",
   "version": "1.0.0",
   "description": "Interactive JavaScript application for exploring the Spectre tile from \"A Chiral Aperiodic Monotile\" by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss.",
-  "main": "app.js",
+  "main": "src/main.ts",
+  "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "jest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "p5": "^1.6.0"
-  },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.8",
