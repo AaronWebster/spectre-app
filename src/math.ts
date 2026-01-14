@@ -1,5 +1,6 @@
 // math.ts - Matrix and vector operations for affine transformations
 
+import { mat2d } from 'gl-matrix';
 import { Point, TransformMatrix } from './types';
 
 // Math constants
@@ -37,31 +38,22 @@ export function pt(x: number, y: number): Point {
 
 /**
  * Invert an affine transformation matrix
+ * Uses gl-matrix for optimized matrix operations
  */
 export function inv(T: TransformMatrix): TransformMatrix {
-  const det = T[0] * T[4] - T[1] * T[3];
-  return [
-    T[4] / det,
-    -T[1] / det,
-    (T[1] * T[5] - T[2] * T[4]) / det,
-    -T[3] / det,
-    T[0] / det,
-    (T[2] * T[3] - T[0] * T[5]) / det
-  ];
+  const result = mat2d.create();
+  mat2d.invert(result, T as mat2d);
+  return result as TransformMatrix;
 }
 
 /**
  * Multiply two affine transformation matrices
+ * Uses gl-matrix for optimized matrix operations
  */
 export function mul(A: TransformMatrix, B: TransformMatrix): TransformMatrix {
-  return [
-    A[0] * B[0] + A[1] * B[3],
-    A[0] * B[1] + A[1] * B[4],
-    A[0] * B[2] + A[1] * B[5] + A[2],
-    A[3] * B[0] + A[4] * B[3],
-    A[3] * B[1] + A[4] * B[4],
-    A[3] * B[2] + A[4] * B[5] + A[5]
-  ];
+  const result = mat2d.create();
+  mat2d.multiply(result, A as mat2d, B as mat2d);
+  return result as TransformMatrix;
 }
 
 /**
