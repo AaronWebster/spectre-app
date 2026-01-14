@@ -1238,6 +1238,8 @@ describe('Syntax Validation', () => {
         const { execFileSync } = require('child_process');
         const path = require('path');
         
+        
+        
         const appPath = path.join(__dirname, 'app.js');
         
         // Use node -c to check syntax without executing
@@ -1250,3 +1252,77 @@ describe('Syntax Validation', () => {
         }).not.toThrow();
     });
 });
+
+/**
+ * Integration tests to verify matrix operations match reference implementation
+ * These tests ensure gl-matrix integration works correctly with format conversion
+ */
+describe('Matrix Operations - Reference Consistency', () => {
+    describe('Matrix format conversion verification', () => {
+        test('matchSeg should create correct transformation', () => {
+            // matchSeg should map unit interval [0,0]->[1,0] to segment p->q
+            const p = { x: 1, y: 2 };
+            const q = { x: 4, y: 6 };
+            
+            const M = matchSeg(p, q);
+            
+            // Test that (0,0) maps to p
+            const t0 = transPt(M, pt(0, 0));
+            expect(Math.abs(t0.x - p.x)).toBeLessThan(1e-10);
+            expect(Math.abs(t0.y - p.y)).toBeLessThan(1e-10);
+            
+            // Test that (1,0) maps to q
+            const t1 = transPt(M, pt(1, 0));
+            expect(Math.abs(t1.x - q.x)).toBeLessThan(1e-10);
+            expect(Math.abs(t1.y - q.y)).toBeLessThan(1e-10);
+        });
+    });
+
+    describe('Matrix inverse and multiply consistency', () => {
+        test('inv(inv(M)) should equal M', () => {
+            const M = [2, 1, 5, 3, 4, 7];
+            const Minv = inv(M);
+            const MInvInv = inv(Minv);
+            
+            for (let i = 0; i < 6; i++) {
+                expect(Math.abs(M[i] - MInvInv[i])).toBeLessThan(1e-10);
+            }
+        });
+
+        test('inverse of translation should translate back', () => {
+            const trans = ttrans(5, 7);
+            const transInv = inv(trans);
+            const identity = mul(trans, transInv);
+            
+            for (let i = 0; i < 6; i++) {
+                expect(Math.abs(identity[i] - ident[i])).toBeLessThan(1e-10);
+            }
+        });
+
+        test('inverse of rotation should rotate back', () => {
+            const angle = Math.PI / 3; // 60 degrees
+            const rot = trot(angle);
+            const rotInv = inv(rot);
+            const identity = mul(rot, rotInv);
+            
+            for (let i = 0; i < 6; i++) {
+                expect(Math.abs(identity[i] - ident[i])).toBeLessThan(1e-10);
+            }
+        });
+
+        test('composition of transformations should work correctly', () => {
+            // Rotate 90 degrees about point (1, 1)
+            // This should map (2, 1) to (1, 2)
+            const center = pt(1, 1);
+            const angle = Math.PI / 2;
+            const M = rotAbout(center, angle);
+            
+            const p = pt(2, 1);
+            const result = transPt(M, p);
+            
+            expect(Math.abs(result.x - 1)).toBeLessThan(1e-10);
+            expect(Math.abs(result.y - 2)).toBeLessThan(1e-10);
+        });
+    });
+});
+
