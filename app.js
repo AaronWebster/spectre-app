@@ -1,7 +1,11 @@
 // app.js - Modern HTML5 Canvas Version
 
+// Constants
+const DEFAULT_SCALE = 20;
+const PARALLEL_LINE_TOLERANCE = 1e-8;
+
 const ident = [1,0,0,0,1,0];
-let to_screen = [20, 0, 0, 0, -20, 0];
+let to_screen = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0];
 let lw_scale = 1;
 let sys;
 let dragging = false;
@@ -555,7 +559,7 @@ function createUI() {
 		} else {
 			sys = buildSpectreBase( false );
 		}
-		to_screen = [20, 0, 0, 0, -20, 0];
+		to_screen = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0];
 		lw_scale = 1;
         needsRedraw = true;
     });
@@ -792,7 +796,7 @@ function onWheel(e) {
 	
     // Center zoom
 	to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
-	lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+	lw_scale = mag( to_screen[0], to_screen[1] ) / DEFAULT_SCALE;
     
     needsRedraw = true;
 }
@@ -826,7 +830,7 @@ function onTouchMove(e) {
 		if (initialPinchDist > 0 && d > 0) {
 			let s = d / initialPinchDist;
 			to_screen = mul( [s, 0, 0, 0, s, 0], to_screen );
-			lw_scale = mag( to_screen[0], to_screen[1] ) / 20.0;
+			lw_scale = mag( to_screen[0], to_screen[1] ) / DEFAULT_SCALE;
 			initialPinchDist = d;
             needsRedraw = true;
 		}
@@ -901,6 +905,9 @@ function draw() {
 // --- Manufacturing Logic ---
 
 // 1. Polygon Erosion (Offsetting)
+// Offsets a polygon by moving each edge perpendicular to itself by delta distance.
+// Positive delta moves edges outward (expands polygon), negative delta moves inward (shrinks polygon).
+// Uses line intersection method to compute new vertices.
 function offsetPolygon(pts, delta) {
     const result = [];
     const len = pts.length;
@@ -908,7 +915,7 @@ function offsetPolygon(pts, delta) {
     // Helper: intersection of two infinite lines defined by (p1, v1) and (p2, v2)
     function intersect(p1, v1, p2, v2) {
         const det = v1.x * v2.y - v1.y * v2.x;
-        if (Math.abs(det) < 1e-8) return null; // Parallel
+        if (Math.abs(det) < PARALLEL_LINE_TOLERANCE) return null; // Parallel
         const t = ((p2.x - p1.x) * v2.y - (p2.y - p1.y) * v2.x) / det;
         return { x: p1.x + t * v1.x, y: p1.y + t * v1.y };
     }
@@ -1030,10 +1037,9 @@ function startExport() {
     window.exportedShapes = [];
     
     // 2. Run a render cycle to collect points (instead of drawing)
-    // We reset the view transform temporarily to Identity so we get raw coordinates
-    // scaled only by tileScale, not by screen pan/zoom.
+    // We reset the view transform to default so we get coordinates scaled by tileScale
     const savedToScreen = [...to_screen];
-    to_screen = [20, 0, 0, 0, -20, 0]; // Reset to default view for export? 
+    to_screen = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0]; // Reset to default view for export
     // Actually, user might want "What they see". 
     // Let's rely on the current transform but we need to realize 
     // DXF 0,0 will be the center of the screen.
@@ -1063,7 +1069,9 @@ function startExport() {
     console.log(`Exporting ${rawShapes.length} tiles. Erosion: ${erosion}`);
 
     // 4. Apply Erosion
-    const cutShapes = rawShapes.map(pts => offsetPolygon(pts, -erosion)); // Negative for inward
+    // Note: offsetPolygon uses positive delta for outward, negative for inward.
+    // We negate erosion here to shrink tiles (move edges inward).
+    const cutShapes = rawShapes.map(pts => offsetPolygon(pts, -erosion));
     
     // 5. Optimize Path
     const optimized = optimizeCutPath(cutShapes);
