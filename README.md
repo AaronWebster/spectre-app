@@ -138,7 +138,7 @@ spectre-app/
 ├── index.html             # HTML entry point
 ├── vite.config.ts         # Vite configuration
 ├── tsconfig.json          # TypeScript configuration
-├── app.test.js            # Mathematical correctness tests (93 tests)
+├── app.test.js            # Mathematical correctness tests (96 tests)
 ├── pixi.test.js           # Pixi.js component tests (60 tests)
 ├── fabrication.test.js    # Fabrication feature tests (7 tests)
 ├── FABRICATION.md         # Fabrication features documentation

@@ -6,6 +6,14 @@ This document describes the comprehensive unit test suite for the Spectre Tile E
 
 The test suite contains **163 tests** organized into **3 test files** that verify the mathematical correctness of the Spectre tile rendering implementation, Pixi.js components, and fabrication features.
 
+### Test Files Summary
+
+1. **app.test.js** (96 tests): Mathematical correctness and geometric properties
+2. **pixi.test.js** (60 tests): Pixi.js rendering components and integration
+3. **fabrication.test.js** (7 tests): Manufacturing features and DXF export
+
+All tests verify that the implementation rigorously matches the mathematical specifications from the reference paper, ensuring that generated shapes and tilings are mathematically correct.
+
 ## Test Coverage
 
 ### app.test.js - Mathematical Correctness Tests (96 tests)
