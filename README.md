@@ -11,6 +11,11 @@ Interactive TypeScript application for exploring the Spectre tile from "A Chiral
 - Zoom and pan controls (mouse wheel and drag, or pinch-to-zoom on touch devices)
 - Export to SVG format
 - Tile numbering option
+- **Fabrication Mode**: Professional-grade manufacturing tools (see [FABRICATION.md](FABRICATION.md))
+  - Robust polygon offsetting for grout/kerf compensation
+  - Tile nesting for material efficiency
+  - Standards-compliant DXF export for CAD/CAM software
+  - Support for inches and millimeters
 
 ## Modern Architecture
 
@@ -98,6 +103,7 @@ spectre-app/
 │   ├── generator.ts       # Canvas tiling and substitution logic (legacy)
 │   ├── generatorPixi.ts   # Pixi.js tiling and substitution logic
 │   ├── constants.ts       # Color maps and tile coordinates
+│   ├── fabrication.ts     # Manufacturing/fabrication utilities
 │   ├── main.ts            # Canvas application entry (legacy)
 │   └── mainPixi.ts        # Pixi.js application entry (active)
 ├── index.html             # HTML entry point
@@ -105,6 +111,8 @@ spectre-app/
 ├── tsconfig.json          # TypeScript configuration
 ├── app.test.js            # Canvas-based unit tests (88 tests)
 ├── pixi.test.js           # Pixi.js unit tests (60 tests)
+├── fabrication.test.js    # Fabrication unit tests (7 tests)
+├── FABRICATION.md         # Fabrication features documentation
 └── package.json           # Dependencies and scripts
 ```
 
@@ -121,7 +129,7 @@ The codebase follows modern TypeScript best practices:
 
 ## Testing
 
-The project includes a comprehensive unit test suite with **148 tests** across two test files.
+The project includes a comprehensive unit test suite with **155 tests** across three test files.
 
 ### Running Tests
 
@@ -150,6 +158,12 @@ npm test
 - Pixi.js Shape Classes (19 tests)
 - Pixi.js Generator Functions (5 tests)
 - Pixi.js Performance Optimizations (2 tests)
+- Integration tests for Matrix, Graphics, Container (34 tests)
+
+**Fabrication tests (fabrication.test.js)** - 7 tests organized into 3 suites:
+- Polygon offsetting with js-angusj-clipper (3 tests)
+- DXF export with dxf-writer (3 tests)
+- Integration tests for offset and export (1 test)
 - Integration tests for Matrix, Graphics, Container (34 tests)
 
 See [TEST_DOCUMENTATION.md](TEST_DOCUMENTATION.md) for detailed information about the test suite.
