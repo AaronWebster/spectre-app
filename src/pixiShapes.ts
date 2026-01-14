@@ -107,15 +107,15 @@ export class PixiShape {
     const fillHex = (fillColor[0] << 16) | (fillColor[1] << 8) | fillColor[2];
     const strokeHex = (strokeColor[0] << 16) | (strokeColor[1] << 8) | strokeColor[2];
 
-    // Pixi.js v8 API: set fill/stroke styles then draw path
-    this.graphics.fill(fillHex);
-    this.graphics.stroke({ width: 0.1, color: strokeHex });
-
+    // Pixi.js v8 API: draw path first, then apply fill/stroke
     this.graphics.moveTo(this.pts[0].x, this.pts[0].y);
     for (let i = 1; i < this.pts.length; i++) {
       this.graphics.lineTo(this.pts[i].x, this.pts[i].y);
     }
     this.graphics.closePath();
+    
+    this.graphics.fill(fillHex);
+    this.graphics.stroke({ width: 0.1, color: strokeHex });
 
     container.addChild(this.graphics);
   }
@@ -214,10 +214,7 @@ export class PixiCurvyShape {
     const fillHex = (fillColor[0] << 16) | (fillColor[1] << 8) | fillColor[2];
     const strokeHex = (strokeColor[0] << 16) | (strokeColor[1] << 8) | strokeColor[2];
 
-    // Pixi.js v8 API: set fill/stroke styles then draw path
-    this.graphics.fill(fillHex);
-    this.graphics.stroke({ width: 0.1, color: strokeHex });
-
+    // Pixi.js v8 API: draw path first, then apply fill/stroke
     this.graphics.moveTo(this.pts[0].x, this.pts[0].y);
 
     for (let idx = 1; idx < this.pts.length; idx += 3) {
@@ -227,6 +224,9 @@ export class PixiCurvyShape {
       this.graphics.bezierCurveTo(a.x, a.y, b.x, b.y, c.x, c.y);
     }
     this.graphics.closePath();
+    
+    this.graphics.fill(fillHex);
+    this.graphics.stroke({ width: 0.1, color: strokeHex });
 
     container.addChild(this.graphics);
   }
