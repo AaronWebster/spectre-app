@@ -2,11 +2,17 @@
 
 import * as PIXI from 'pixi.js';
 import { Pane } from 'tweakpane';
-import { TransformMatrix, ColorMap } from './types';
+import { TransformMatrix, ColorMap, Point } from './types';
 import { buildSpectreBase, buildHatTurtleBase, buildHexBase, buildSupertiles } from './generatorPixi';
 import { PixiShape, PixiCurvyShape, PixiMeta } from './pixiShapes';
-import { DEFAULT_SCALE, colmap53, colmap_orig, colmap_mystics } from './constants';
+import { DEFAULT_SCALE, colmap53, colmap_orig, colmap_mystics, SPECTRE_COORDS } from './constants';
 import { ident } from './math';
+import { 
+  initializeClipper, 
+  offsetPolygon, 
+  exportFabricationDXF, 
+  exportOptimizedDXF 
+} from './fabrication';
 
 // Application State
 let app: PIXI.Application;
@@ -33,8 +39,10 @@ let boundingBoxHeight = 100;
 let tileCount = 0;
 let visibleTileCount = 0;
 
-// Fabrication Mode State (not yet fully implemented)
+// Fabrication Mode State
 let fabricationMode = false;
+let nestedShapes: Point[][] = [];
+let fabYield = 0;
 let stockWidth = 24;
 let stockHeight = 24;
 let stockMargin = 0.25;
@@ -280,8 +288,15 @@ function createUI(): void {
   // Preview Nest Button
   fabricationFolder.addButton({
     title: 'Preview Nest',
+  }).on('click', async () => {
+    await nestTiles();
+  });
+
+  // Export DXF Button
+  fabricationFolder.addButton({
+    title: 'Export DXF',
   }).on('click', () => {
-    console.log('Preview nest functionality not yet implemented');
+    exportFabDXF();
   });
 
   // Yield (monitor only)
@@ -529,6 +544,125 @@ function onResize(): void {
 }
 
 /**
+ * Add bridges between tiles for chain cutting
+ */
+function addBridges(shapes: Point[][]): Point[][] {
+  if (shapes.length === 0) return shapes;
+
+  const result: Point[][] = [];
+
+  for (let i = 0; i < shapes.length; i++) {
+    result.push(shapes[i]);
+
+    // Add bridge to next tile
+    if (i < shapes.length - 1) {
+      const currentTile = shapes[i];
+      const nextTile = shapes[i + 1];
+
+      // Find closest points between tiles
+      const endPoint = currentTile[currentTile.length - 1];
+      const startPoint = nextTile[0];
+
+      // Create a bridge line (open polyline)
+      result.push([endPoint, startPoint]);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Nest tiles for fabrication mode
+ * Uses robust polygon offsetting to handle grout and kerf correctly
+ */
+async function nestTiles(): Promise<void> {
+  // Use the base spectre coordinates
+  const spectre = SPECTRE_COORDS;
+
+  // Scale the tile by tileScale
+  const scaledTile: Point[] = spectre.map(p => ({ x: p.x * tileScale, y: p.y * tileScale }));
+
+  // Get grout and kerf values
+  const grout = uiState.grout;
+  const kerf = uiState.kerf;
+
+  // Calculate erosion: (Grout - Kerf) / 2
+  const erosion = (grout - kerf) / 2.0;
+
+  try {
+    // Apply erosion (negative for inward offset) using robust clipper library
+    const erodedTile = await offsetPolygon(scaledTile, -erosion);
+
+    // Calculate tile bounding box
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of erodedTile) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    const tileWidth = maxX - minX;
+    const tileHeight = maxY - minY;
+
+    // Calculate usable stock area
+    const usableWidth = stockWidth - 2 * stockMargin;
+    const usableHeight = stockHeight - 2 * stockMargin;
+
+    // Calculate how many tiles fit
+    const tilesX = Math.floor(usableWidth / tileWidth);
+    const tilesY = Math.floor(usableHeight / tileHeight);
+
+    // Generate nested shapes
+    nestedShapes = [];
+    for (let row = 0; row < tilesY; row++) {
+      for (let col = 0; col < tilesX; col++) {
+        // Calculate position (starting from margin, placing tiles in a grid)
+        const offsetX = stockMargin + col * tileWidth - minX;
+        const offsetY = stockMargin + row * tileHeight - minY;
+
+        // Translate tile
+        const translatedTile = erodedTile.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }));
+        nestedShapes.push(translatedTile);
+      }
+    }
+
+    // Update yield count
+    fabYield = nestedShapes.length;
+    uiState.yield = fabYield;
+
+    // Apply chain cutting if enabled
+    if (chainCutting && nestedShapes.length > 1) {
+      nestedShapes = addBridges(nestedShapes);
+    }
+
+    console.log(`Nested ${fabYield} tiles successfully`);
+    needsRedraw = true;
+  } catch (error) {
+    console.error('Error nesting tiles:', error);
+    alert('Error nesting tiles. Please check console for details.');
+  }
+}
+
+/**
+ * Export DXF for fabrication mode
+ */
+function exportFabDXF(): void {
+  if (nestedShapes.length === 0) {
+    alert('Please click "Preview Nest" first to generate tiles.');
+    return;
+  }
+
+  try {
+    exportFabricationDXF(nestedShapes, stockWidth, stockHeight, 'Inches');
+    alert(`Exported ${fabYield} tiles to DXF with stock dimensions ${stockWidth}x${stockHeight} inches.`);
+  } catch (error) {
+    console.error('Error exporting DXF:', error);
+    alert('Error exporting DXF. Please check console for details.');
+  }
+}
+
+/**
  * Initialize the application
  */
 async function init(): Promise<void> {
@@ -549,6 +683,9 @@ async function init(): Promise<void> {
   // Add canvas to DOM
   document.body.appendChild(app.canvas);
   app.canvas.style.display = 'block';
+
+  // Initialize fabrication libraries (clipper for polygon offsetting)
+  await initializeClipper();
 
   // Create main container
   mainContainer = new PIXI.Container();
