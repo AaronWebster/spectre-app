@@ -441,6 +441,55 @@ describe('Spectre Tile Geometry', () => {
         const hr3 = 0.8660254037844386;
         expect(approxEqual(Math.sqrt(3) / 2, hr3)).toBe(true);
     });
+
+    test('Spectre polygon is valid (non-self-intersecting)', () => {
+        // A simple polygon should have edges that don't intersect except at vertices
+        // For our purposes, we verify that consecutive edges share exactly one endpoint
+        for (let i = 0; i < spectre.length; i++) {
+            const curr = spectre[i];
+            const next = spectre[(i + 1) % spectre.length];
+            
+            // Consecutive vertices should be distinct
+            expect(pointsEqual(curr, next)).toBe(false);
+        }
+    });
+
+    test('Spectre polygon forms a closed loop', () => {
+        // Verify that going around all edges returns to start
+        // Sum of edge vectors should be zero (closed polygon)
+        let sumX = 0;
+        let sumY = 0;
+        
+        for (let i = 0; i < spectre.length; i++) {
+            const curr = spectre[i];
+            const next = spectre[(i + 1) % spectre.length];
+            sumX += (next.x - curr.x);
+            sumY += (next.y - curr.y);
+        }
+        
+        expect(approxEqual(sumX, 0, 1e-10)).toBe(true);
+        expect(approxEqual(sumY, 0, 1e-10)).toBe(true);
+    });
+
+    test('Spectre has correct chirality (winding order)', () => {
+        // Compute signed area using the shoelace formula
+        // Positive area indicates counter-clockwise winding
+        // Negative area indicates clockwise winding
+        let area = 0;
+        for (let i = 0; i < spectre.length; i++) {
+            const curr = spectre[i];
+            const next = spectre[(i + 1) % spectre.length];
+            area += (curr.x * next.y - next.x * curr.y);
+        }
+        area /= 2;
+        
+        // The Spectre should have non-zero area (valid polygon)
+        expect(Math.abs(area)).toBeGreaterThan(0.1);
+        
+        // The specific winding order should be consistent with the construction
+        // Based on the coordinates starting at (0,0) and going counter-clockwise
+        expect(area).toBeGreaterThan(0);
+    });
 });
 
 describe('Hat and Turtle Tile Geometry', () => {

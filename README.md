@@ -158,7 +158,7 @@ The codebase follows modern TypeScript best practices:
 
 ## Testing
 
-The project includes a comprehensive unit test suite with **160 tests** across three test files.
+The project includes a comprehensive unit test suite with **163 tests** across three test files.
 
 ### Running Tests
 
@@ -169,10 +169,10 @@ npm test
 
 ### Test Coverage
 
-**Mathematical correctness tests (app.test.js)** - 93 tests organized into 11 suites:
+**Mathematical correctness tests (app.test.js)** - 96 tests organized into 11 suites:
 - Point operations (5 tests)
 - Affine matrix operations (20 tests)
-- Spectre tile geometry (8 tests)
+- Spectre tile geometry (11 tests) - **Enhanced with polygon validity and chirality tests**
 - Hat and Turtle tile geometry (7 tests)
 - Hexagon tile geometry (5 tests)
 - Supertile substitution system (5 tests)

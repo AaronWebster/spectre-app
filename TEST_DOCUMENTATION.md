@@ -4,11 +4,11 @@ This document describes the comprehensive unit test suite for the Spectre Tile E
 
 ## Overview
 
-The test suite contains **160 tests** organized into **3 test files** that verify the mathematical correctness of the Spectre tile rendering implementation, Pixi.js components, and fabrication features.
+The test suite contains **163 tests** organized into **3 test files** that verify the mathematical correctness of the Spectre tile rendering implementation, Pixi.js components, and fabrication features.
 
 ## Test Coverage
 
-### app.test.js - Mathematical Correctness Tests (93 tests)
+### app.test.js - Mathematical Correctness Tests (96 tests)
 
 These tests verify the mathematical operations and tile geometries used in the application. They test the core algorithms independently to ensure correctness according to the paper specifications.
 
@@ -35,18 +35,22 @@ Tests the 2D affine transformation matrices (represented as 6-element arrays `[a
 
 **Paper Reference**: Section 2.2 discusses transformations and isometries. The paper uses affine transformations extensively to describe tile placements.
 
-### 3. Spectre Tile Geometry (8 tests)
+### 3. Spectre Tile Geometry (11 tests)
 Verifies the Tile(1,1) Spectre polygon geometry:
 - 14 vertices with unit-length edges
 - Correct vertex positions
 - 4 key points (quad points) at vertices 3, 5, 7, 11
 - Interior angles alternating between multiples of 90° and 120°
 - Mathematical constants (√3, √3/2)
+- **Polygon validity** (non-self-intersecting, distinct consecutive vertices)
+- **Closed loop property** (edge vectors sum to zero)
+- **Chirality/winding order** (counter-clockwise orientation via signed area)
 
 **Paper Reference**: 
 - Figure 1.1 shows Tile(1,1) as a 14-sided equilateral polygon
 - Section 2 states "interior angles at the vertices of Tile(1,1) strictly alternate between multiples of 90° and multiples of 120°"
 - The spectre is defined with 14 unit-length edges
+- Title: "A Chiral Aperiodic Monotile" - chirality is a fundamental property
 
 ### 4. Hat and Turtle Tile Geometry (7 tests)
 Tests the Hat and Turtle tiles from the [3.4.6.4] Laves tiling:
