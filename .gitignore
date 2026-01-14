@@ -2,6 +2,11 @@
 node_modules/
 npm-debug.log*
 
+# Vite build artifacts
+dist/
+dist-ssr/
+*.local
+
 # Test coverage
 coverage/
 
