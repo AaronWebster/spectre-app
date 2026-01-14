@@ -39,6 +39,9 @@ export function pt(x: number, y: number): Point {
 /**
  * Invert an affine transformation matrix
  * Uses gl-matrix for optimized matrix operations
+ * 
+ * Note: TransformMatrix [a, b, c, d, e, f] is compatible with gl-matrix mat2d format.
+ * Both represent 2D affine transformations as 6-element arrays.
  */
 export function inv(T: TransformMatrix): TransformMatrix {
   const result = mat2d.create();
@@ -49,6 +52,9 @@ export function inv(T: TransformMatrix): TransformMatrix {
 /**
  * Multiply two affine transformation matrices
  * Uses gl-matrix for optimized matrix operations
+ * 
+ * Note: TransformMatrix [a, b, c, d, e, f] is compatible with gl-matrix mat2d format.
+ * Both represent 2D affine transformations as 6-element arrays.
  */
 export function mul(A: TransformMatrix, B: TransformMatrix): TransformMatrix {
   const result = mat2d.create();
