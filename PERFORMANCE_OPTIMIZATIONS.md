@@ -27,6 +27,16 @@ Replaced custom matrix operations with the **gl-matrix** library (specifically `
 - **Memory allocation**: More efficient, especially during recursive `buildSupertiles` calls
 - **Overall**: Noticeable improvement when generating high tile counts (6+, 7+)
 
+### Potential Further Optimizations
+
+The current implementation creates new matrices for each operation. For even better performance in tight loops:
+
+1. **Matrix pooling**: Reuse Float32Array matrices instead of creating new ones
+2. **Error handling**: Add checks for singular matrices (determinant = 0) in `inv()` function
+3. **Batch operations**: Process multiple matrix operations in batches
+
+These optimizations were not implemented to maintain minimal changes and preserve existing behavior.
+
 ## Future Optimization Opportunities
 
 ### Web Workers for Expensive Computations
