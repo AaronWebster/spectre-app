@@ -130,21 +130,17 @@ function matchTwo( p1, q1, p2, q2 ) {
 
 // Check if a tile is fully outside the bounding box
 // Returns true if the tile should be invisible
-// The bounding box is in tile coordinate space (before any transformations)
 function isTileOutsideBounds(pts, ctx) {
-	// We need to get the tile's position in world coordinate space
-	// The context has: center translation + tileScale + to_screen
-	// We want to check against the bounding box in tile space
-	
-	// Get the current transformation matrix
+	// Get the current transformation matrix from the context
+	// This includes: center translation + tileScale + to_screen
 	const transform = ctx.getTransform();
 	
-	// Calculate the bounding box of the tile in the current coordinate system
+	// Calculate the bounding box of the tile in screen space
 	let minX = Infinity, maxX = -Infinity;
 	let minY = Infinity, maxY = -Infinity;
 	
 	for (const p of pts) {
-		// Transform the point using the current context transformation
+		// Transform the point to screen coordinates
 		const x = transform.a * p.x + transform.c * p.y + transform.e;
 		const y = transform.b * p.x + transform.d * p.y + transform.f;
 		
@@ -158,8 +154,8 @@ function isTileOutsideBounds(pts, ctx) {
 	const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
 	const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
 	
-	// The bounding box dimensions in screen space
-	// boundingBox is in tile units, so we scale it by the current transformation scale
+	// Convert bounding box dimensions to screen space
+	// The bounding box is specified in tile units, so we scale by the transformation scale
 	const halfWidth = (boundingBoxWidth / 2) * scaleX;
 	const halfHeight = (boundingBoxHeight / 2) * scaleY;
 	
@@ -198,13 +194,12 @@ class Shape {
 
 	draw(ctx) {
 		const isOutside = isTileOutsideBounds(this.pts, ctx);
-		if (isOutside) {
-			// Render fully transparent (but still count the tile)
-			drawPolygon( ctx, this.pts, null, null, 0 );
-		} else {
+		if (!isOutside) {
+			// Only draw if tile is inside bounds
 			drawPolygon( ctx, this.pts, colmap[this.label], [0,0,0], 0.1 );
 			visibleTileCount++;
 		}
+		// Always count the tile even if not visible
 		tileCount++;
 	}
 
@@ -246,10 +241,8 @@ class CurvyShape {
 
 	draw(ctx) {
 		const isOutside = isTileOutsideBounds(this.pts, ctx);
-		if (isOutside) {
-			// Render fully transparent (don't draw anything)
-			// but still count the tile
-		} else {
+		if (!isOutside) {
+			// Only draw if tile is inside bounds
 			const col = colmap[this.label];
 			ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
 			ctx.strokeStyle = "rgb(0,0,0)";
@@ -269,6 +262,7 @@ class CurvyShape {
 			ctx.stroke();
 			visibleTileCount++;
 		}
+		// Always count the tile even if not visible
 		tileCount++;
 	}
 
