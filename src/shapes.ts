@@ -183,12 +183,12 @@ export class Meta {
     this.geoms.push({ geom: g, xform: T });
   }
 
-  draw(ctx: CanvasRenderingContext2D, ...args: any[]): void {
+  draw(ctx: CanvasRenderingContext2D, colmap: ColorMap, boundingBoxWidth: number, boundingBoxHeight: number): void {
     for (const g of this.geoms) {
       ctx.save();
       const M = g.xform;
       ctx.transform(M[0], M[3], M[1], M[4], M[2], M[5]);
-      g.geom.draw(ctx, ...args);
+      g.geom.draw(ctx, colmap, boundingBoxWidth, boundingBoxHeight);
       ctx.restore();
     }
   }

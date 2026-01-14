@@ -50,15 +50,10 @@ export function buildSpectreBase(curved: boolean): Record<string, Shape | CurvyS
  * Build the Hat/Turtle tile system
  */
 export function buildHatTurtleBase(hat_dominant: boolean): Record<string, Shape | Meta> {
-  const r3 = 1.7320508075688772;
   const hr3 = 0.8660254037844386;
 
   function hexPt(x: number, y: number): Point {
     return pt(x + 0.5 * y, -hr3 * y);
-  }
-
-  function hexPt2(x: number, y: number): Point {
-    return pt(x + hr3 * y, -0.5 * y);
   }
 
   const hat: Point[] = [

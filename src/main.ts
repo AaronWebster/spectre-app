@@ -3,8 +3,8 @@
 import { TransformMatrix, ColorMap } from './types';
 import { buildSpectreBase, buildHatTurtleBase, buildHexBase, buildSupertiles } from './generator';
 import { Shape, CurvyShape, Meta, resetTileCounts, getTileCounts } from './shapes';
-import { DEFAULT_SCALE, colmap53, colmap_orig, colmap_mystics, tile_names } from './constants';
-import { ident, mul } from './math';
+import { DEFAULT_SCALE, colmap53, colmap_orig, colmap_mystics } from './constants';
+import { ident } from './math';
 
 // Application State
 let canvas: HTMLCanvasElement;
@@ -27,10 +27,8 @@ let tileScale = 1;
 let boundingBoxWidth = 100;
 let boundingBoxHeight = 100;
 
-// Fabrication Mode State
+// Fabrication Mode State (not yet fully implemented)
 let fabricationMode = false;
-let nestedShapes: any[] = [];
-let fabYield = 0;
 let stockWidth = 24;
 let stockHeight = 24;
 let stockMargin = 0.25;
@@ -41,9 +39,6 @@ let tile_sel: HTMLSelectElement;
 let shape_sel: HTMLSelectElement;
 let colscheme_sel: HTMLSelectElement;
 let tile_count_label: HTMLDivElement;
-let tileScaleInput: HTMLInputElement;
-let boundingBoxWidthInput: HTMLInputElement;
-let boundingBoxHeightInput: HTMLInputElement;
 let groutInput: HTMLInputElement;
 let kerfInput: HTMLInputElement;
 let mode_sel: HTMLSelectElement;
@@ -255,20 +250,20 @@ function createUI(): void {
 
   // Tile Scale
   addLabel('Tile Scale', 10, 310);
-  tileScaleInput = addNumberInput(10, 330, tileScale, 0.1, 10, 0.1, (val) => {
+  addNumberInput(10, 330, tileScale, 0.1, 10, 0.1, (val) => {
     tileScale = val;
     needsRedraw = true;
   });
 
   // Bounding Box Controls
   addLabel('Bounding Box Width', 10, 370);
-  boundingBoxWidthInput = addNumberInput(10, 390, boundingBoxWidth, 10, 1000, 10, (val) => {
+  addNumberInput(10, 390, boundingBoxWidth, 10, 1000, 10, (val) => {
     boundingBoxWidth = val;
     needsRedraw = true;
   });
 
   addLabel('Bounding Box Height', 10, 430);
-  boundingBoxHeightInput = addNumberInput(10, 450, boundingBoxHeight, 10, 1000, 10, (val) => {
+  addNumberInput(10, 450, boundingBoxHeight, 10, 1000, 10, (val) => {
     boundingBoxHeight = val;
     needsRedraw = true;
   });
@@ -286,12 +281,12 @@ function createUI(): void {
 
   // Fabrication-specific UI (initially hidden)
   addLabel('Grout (inches)', 10, 570);
-  groutInput = addNumberInput(10, 590, 0.125, 0, 1, 0.125, (val) => {
+  groutInput = addNumberInput(10, 590, 0.125, 0, 1, 0.125, () => {
     needsRedraw = true;
   });
 
   addLabel('Kerf (inches)', 10, 630);
-  kerfInput = addNumberInput(10, 650, 0.05, 0, 1, 0.01, (val) => {
+  kerfInput = addNumberInput(10, 650, 0.05, 0, 1, 0.01, () => {
     needsRedraw = true;
   });
 
@@ -456,7 +451,7 @@ function onMouseMove(e: MouseEvent): void {
   }
 }
 
-function onMouseUp(e: MouseEvent): void {
+function onMouseUp(): void {
   dragging = false;
 }
 
