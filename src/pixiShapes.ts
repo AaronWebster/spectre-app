@@ -15,14 +15,12 @@ function isTileOutsideBounds(
   viewWidth: number,
   viewHeight: number
 ): boolean {
-  // Calculate the bounding box of the tile in screen space
   let minX = Infinity,
     maxX = -Infinity;
   let minY = Infinity,
     maxY = -Infinity;
 
   for (const p of pts) {
-    // Apply transformation
     const transformed = transform.apply({ x: p.x, y: p.y });
 
     minX = Math.min(minX, transformed.x);
@@ -31,18 +29,16 @@ function isTileOutsideBounds(
     maxY = Math.max(maxY, transformed.y);
   }
 
-  // Calculate half dimensions based on transform scale
+  // Calculate approximate scale from the transform matrix to scale the bounding box
   const scaleX = Math.sqrt(transform.a * transform.a + transform.b * transform.b);
   const scaleY = Math.sqrt(transform.c * transform.c + transform.d * transform.d);
   
   const halfWidth = (boundingBoxWidth / 2) * scaleX;
   const halfHeight = (boundingBoxHeight / 2) * scaleY;
 
-  // Center is at viewWidth/2, viewHeight/2
   const centerX = viewWidth / 2;
   const centerY = viewHeight / 2;
 
-  // Tile is outside if its bounding box doesn't overlap with the viewing box
   return (
     maxX < centerX - halfWidth ||
     minX > centerX + halfWidth ||
@@ -71,6 +67,7 @@ export class PixiShape {
    */
   draw(
     container: PIXI.Container,
+    currentTransform: PIXI.Matrix, // NEW: explicitly passed transform
     colmap: ColorMap,
     boundingBoxWidth: number,
     boundingBoxHeight: number,
@@ -78,11 +75,10 @@ export class PixiShape {
     viewHeight: number,
     counters: { total: number; visible: number }
   ): void {
-    // Get the world transform to check culling
-    const worldTransform = container.worldTransform;
+    // Use the explicitly passed transform for culling instead of container.worldTransform
     const isOutside = isTileOutsideBounds(
       this.pts,
-      worldTransform,
+      currentTransform,
       boundingBoxWidth,
       boundingBoxHeight,
       viewWidth,
@@ -92,7 +88,6 @@ export class PixiShape {
     counters.total++;
 
     if (isOutside) {
-      // Don't render tiles outside viewport
       return;
     }
 
@@ -112,7 +107,7 @@ export class PixiShape {
     const fillHex = (fillColor[0] << 16) | (fillColor[1] << 8) | fillColor[2];
     const strokeHex = (strokeColor[0] << 16) | (strokeColor[1] << 8) | strokeColor[2];
 
-    // Draw polygon
+    // Pixi.js v8 API: set fill/stroke styles then draw path
     this.graphics.fill(fillHex);
     this.graphics.stroke({ width: 0.1, color: strokeHex });
 
@@ -182,6 +177,7 @@ export class PixiCurvyShape {
 
   draw(
     container: PIXI.Container,
+    currentTransform: PIXI.Matrix, // NEW: explicitly passed transform
     colmap: ColorMap,
     boundingBoxWidth: number,
     boundingBoxHeight: number,
@@ -189,10 +185,9 @@ export class PixiCurvyShape {
     viewHeight: number,
     counters: { total: number; visible: number }
   ): void {
-    const worldTransform = container.worldTransform;
     const isOutside = isTileOutsideBounds(
       this.pts,
-      worldTransform,
+      currentTransform,
       boundingBoxWidth,
       boundingBoxHeight,
       viewWidth,
@@ -219,6 +214,7 @@ export class PixiCurvyShape {
     const fillHex = (fillColor[0] << 16) | (fillColor[1] << 8) | fillColor[2];
     const strokeHex = (strokeColor[0] << 16) | (strokeColor[1] << 8) | strokeColor[2];
 
+    // Pixi.js v8 API: set fill/stroke styles then draw path
     this.graphics.fill(fillHex);
     this.graphics.stroke({ width: 0.1, color: strokeHex });
 
@@ -276,6 +272,7 @@ export class PixiMeta {
 
   draw(
     parentContainer: PIXI.Container,
+    currentTransform: PIXI.Matrix, // NEW: explicitly passed transform
     colmap: ColorMap,
     boundingBoxWidth: number,
     boundingBoxHeight: number,
@@ -284,18 +281,30 @@ export class PixiMeta {
     counters: { total: number; visible: number }
   ): void {
     for (const g of this.geoms) {
-      // Create a container for each child with its transform
       const childContainer = new PIXI.Container();
       
-      // Apply transform matrix
       const M = g.xform;
-      const matrix = new PIXI.Matrix(M[0], M[3], M[1], M[4], M[2], M[5]);
-      childContainer.setFromMatrix(matrix);
+      // Local transform of this child
+      const localMatrix = new PIXI.Matrix(M[0], M[3], M[1], M[4], M[2], M[5]);
+      childContainer.setFromMatrix(localMatrix);
       
       parentContainer.addChild(childContainer);
       
-      // Draw the child geometry
-      g.geom.draw(childContainer, colmap, boundingBoxWidth, boundingBoxHeight, viewWidth, viewHeight, counters);
+      // Calculate the new world transform for the child by appending parent transform
+      // Pixi matrix multiplication: childWorld = local * parentWorld
+      // Matrix.append() does: this = this * other
+      const nextTransform = localMatrix.clone().append(currentTransform);
+
+      g.geom.draw(
+        childContainer, 
+        nextTransform, // Pass the calculated transform down
+        colmap, 
+        boundingBoxWidth, 
+        boundingBoxHeight, 
+        viewWidth, 
+        viewHeight, 
+        counters
+      );
     }
   }
 
