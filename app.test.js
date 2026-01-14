@@ -1232,3 +1232,21 @@ describe('Tile Scale and Bounding Box', () => {
         expect(visibleCount).toBeLessThanOrEqual(totalCount);
     });
 });
+
+describe('Syntax Validation', () => {
+    test('app.js has valid JavaScript syntax', () => {
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        
+        const appPath = path.join(__dirname, 'app.js');
+        
+        // Use node -c to check syntax without executing
+        // If syntax is invalid, this will throw an error
+        expect(() => {
+            execFileSync('node', ['-c', appPath], { 
+                encoding: 'utf8',
+                stdio: 'pipe'
+            });
+        }).not.toThrow();
+    });
+});
