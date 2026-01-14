@@ -1,12 +1,24 @@
-# Test Documentation for app.js
+# Test Documentation
 
-This document describes the comprehensive unit test suite for the Spectre app's mathematical rendering functions, based on the paper "A Chiral Aperiodic Monotile" by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss (2305.17743v2.pdf).
+This document describes the comprehensive unit test suite for the Spectre Tile Explorer, based on the paper "A Chiral Aperiodic Monotile" by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss (2305.17743v2.pdf).
 
 ## Overview
 
-The test suite (`app.test.js`) contains **87 tests** organized into **11 test suites** that verify the mathematical correctness of the Spectre tile rendering implementation.
+The test suite contains **163 tests** organized into **3 test files** that verify the mathematical correctness of the Spectre tile rendering implementation, Pixi.js components, and fabrication features.
+
+### Test Files Summary
+
+1. **app.test.js** (96 tests): Mathematical correctness and geometric properties
+2. **pixi.test.js** (60 tests): Pixi.js rendering components and integration
+3. **fabrication.test.js** (7 tests): Manufacturing features and DXF export
+
+All tests verify that the implementation rigorously matches the mathematical specifications from the reference paper, ensuring that generated shapes and tilings are mathematically correct.
 
 ## Test Coverage
+
+### app.test.js - Mathematical Correctness Tests (96 tests)
+
+These tests verify the mathematical operations and tile geometries used in the application. They test the core algorithms independently to ensure correctness according to the paper specifications.
 
 ### 1. Point Operations (5 tests)
 Tests the fundamental point manipulation functions:
@@ -31,18 +43,22 @@ Tests the 2D affine transformation matrices (represented as 6-element arrays `[a
 
 **Paper Reference**: Section 2.2 discusses transformations and isometries. The paper uses affine transformations extensively to describe tile placements.
 
-### 3. Spectre Tile Geometry (8 tests)
+### 3. Spectre Tile Geometry (11 tests)
 Verifies the Tile(1,1) Spectre polygon geometry:
 - 14 vertices with unit-length edges
 - Correct vertex positions
 - 4 key points (quad points) at vertices 3, 5, 7, 11
 - Interior angles alternating between multiples of 90° and 120°
 - Mathematical constants (√3, √3/2)
+- **Polygon validity** (non-self-intersecting, distinct consecutive vertices)
+- **Closed loop property** (edge vectors sum to zero)
+- **Chirality/winding order** (counter-clockwise orientation via signed area)
 
 **Paper Reference**: 
 - Figure 1.1 shows Tile(1,1) as a 14-sided equilateral polygon
 - Section 2 states "interior angles at the vertices of Tile(1,1) strictly alternate between multiples of 90° and multiples of 120°"
 - The spectre is defined with 14 unit-length edges
+- Title: "A Chiral Aperiodic Monotile" - chirality is a fundamental property
 
 ### 4. Hat and Turtle Tile Geometry (7 tests)
 Tests the Hat and Turtle tiles from the [3.4.6.4] Laves tiling:
@@ -114,7 +130,32 @@ Tests robustness:
 - Frame computation with zero coefficients
 - Degenerate cases (identical segment endpoints)
 
-### 11. Tile Scale and Bounding Box (10 tests)
+### 12. Matrix Operations - Reference Consistency (16 tests)
+
+Additional tests to verify consistency of matrix operations across different scenarios:
+- Double inverse returns original matrix
+- Inverse of translation and rotation
+- Composition of transformations
+- matchSeg transformation correctness
+
+## pixi.test.js - Pixi.js Component Tests (60 tests)
+
+These tests verify the Pixi.js-based rendering components work correctly:
+
+- **Pixi.js Shape Classes** (19 tests): PixiShape, PixiCurvyShape, and PixiMeta classes
+- **Pixi.js Generator Functions** (5 tests): buildSpectreBase, buildHatTurtleBase, buildHexBase
+- **Performance Optimizations** (2 tests): Viewport culling and rendering efficiency
+- **Integration Tests** (34 tests): Matrix transformations, graphics operations, container management
+
+## fabrication.test.js - Fabrication Feature Tests (7 tests)
+
+These tests verify the manufacturing/fabrication features:
+
+- **Polygon Offsetting** (3 tests): Inward/outward offsetting with js-angusj-clipper
+- **DXF Export** (3 tests): Standards-compliant DXF generation with dxf-writer
+- **Integration Tests** (1 test): Combined offset and export workflows
+
+## Running the Tests
 Tests the new tile scaling and bounding box culling features:
 - Tile scale of 1 maintains original size
 - Tile scale of 2 doubles the size
@@ -156,5 +197,5 @@ These tests focus on **mathematical correctness** rather than visual rendering. 
 ## References
 
 - Original paper: "A Chiral Aperiodic Monotile" (2305.17743v2.pdf)
-- Implementation: `app.js`
+- Source code: `src/math.ts`, `src/generatorPixi.ts`, `src/pixiShapes.ts`, `src/fabrication.ts`
 - Interactive demo: cs.uwaterloo.ca/~csk/spectre/
