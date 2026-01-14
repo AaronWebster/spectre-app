@@ -1,14 +1,15 @@
-// main.ts - Entry point for the Spectre Tile Explorer application
+// mainPixi.ts - Entry point using Pixi.js renderer
 
+import * as PIXI from 'pixi.js';
 import { TransformMatrix, ColorMap } from './types';
 import { buildSpectreBase, buildHatTurtleBase, buildHexBase, buildSupertiles } from './generator';
-import { Shape, CurvyShape, Meta, resetTileCounts, getTileCounts } from './shapes';
+import { Shape, CurvyShape, Meta } from './shapes';
 import { DEFAULT_SCALE, colmap53, colmap_orig, colmap_mystics } from './constants';
-import { ident } from './math';
+import { ident, mul, ttrans } from './math';
 
 // Application State
-let canvas: HTMLCanvasElement;
-let ctx: CanvasRenderingContext2D;
+let app: PIXI.Application;
+let mainContainer: PIXI.Container;
 let width: number;
 let height: number;
 let needsRedraw = true;
@@ -26,6 +27,10 @@ let lastMouseX = 0,
 let tileScale = 1;
 let boundingBoxWidth = 100;
 let boundingBoxHeight = 100;
+
+// Tile counters
+let tileCount = 0;
+let visibleTileCount = 0;
 
 // Fabrication Mode State (not yet fully implemented)
 let fabricationMode = false;
@@ -67,6 +72,7 @@ function addLabel(text: string, x: number, y: number): HTMLDivElement {
   el.style.padding = '2px 5px';
   el.style.borderRadius = '3px';
   el.style.pointerEvents = 'none';
+  el.style.zIndex = '1000';
   document.body.appendChild(el);
   return el;
 }
@@ -90,6 +96,7 @@ function addSelect(
   el.style.fontSize = '12px';
   el.style.borderRadius = '3px';
   el.style.fontFamily = 'sans-serif';
+  el.style.zIndex = '1000';
 
   for (const opt of options) {
     const option = document.createElement('option');
@@ -126,6 +133,7 @@ function addButton(
   el.style.borderRadius = '3px';
   el.style.cursor = 'pointer';
   el.style.fontFamily = 'sans-serif';
+  el.style.zIndex = '1000';
   el.addEventListener('click', onclick);
   document.body.appendChild(el);
   return el;
@@ -159,6 +167,7 @@ function addNumberInput(
   el.style.fontSize = '12px';
   el.style.borderRadius = '3px';
   el.style.fontFamily = 'sans-serif';
+  el.style.zIndex = '1000';
   el.addEventListener('change', (e) => {
     onchange(parseFloat((e.target as HTMLInputElement).value));
   });
@@ -181,6 +190,7 @@ function addCheckbox(
   el.style.position = 'absolute';
   el.style.left = x + 'px';
   el.style.top = y + 'px';
+  el.style.zIndex = '1000';
   el.addEventListener('change', (e) => {
     onchange((e.target as HTMLInputElement).checked);
   });
@@ -326,7 +336,7 @@ function toggleUIVisibility(): void {
   const allElements = document.querySelectorAll('div, select, button, input');
   allElements.forEach((el) => {
     const htmlEl = el as HTMLElement;
-    if (htmlEl !== canvas && htmlEl.style.position === 'absolute') {
+    if (htmlEl !== app.canvas && htmlEl.style.position === 'absolute') {
       htmlEl.style.display = uibox ? 'block' : 'none';
     }
   });
@@ -382,32 +392,76 @@ function exportSVG(): void {
 }
 
 /**
- * Main rendering loop
+ * Draw a shape using Pixi.js graphics
  */
-function loop(): void {
-  if (needsRedraw) {
-    draw();
-    needsRedraw = false;
+function drawShapeToPixi(
+  graphics: PIXI.Graphics,
+  shape: Shape | CurvyShape
+): void {
+  // Draw the shape
+  const fillColor = colmap[shape.label];
+  const fillHex = (fillColor[0] << 16) | (fillColor[1] << 8) | fillColor[2];
+  
+  const pts = shape.pts;
+  
+  graphics.fill(fillHex);
+  graphics.stroke({ width: 0.1, color: 0x000000 });
+
+  if (shape instanceof CurvyShape) {
+    // Draw curvy shape with bezier curves
+    graphics.moveTo(pts[0].x, pts[0].y);
+    for (let idx = 1; idx < pts.length; idx += 3) {
+      const a = pts[idx];
+      const b = pts[idx + 1];
+      const c = pts[idx + 2];
+      graphics.bezierCurveTo(a.x, a.y, b.x, b.y, c.x, c.y);
+    }
+  } else {
+    // Draw regular polygon
+    graphics.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      graphics.lineTo(pts[i].x, pts[i].y);
+    }
   }
-  requestAnimationFrame(loop);
+  graphics.closePath();
+
+  tileCount++;
+  visibleTileCount++;
 }
 
 /**
- * Draw the tiles
+ * Recursively draw tiles using Pixi.js
+ */
+function drawTilesToPixi(
+  container: PIXI.Container,
+  tile: Shape | CurvyShape | Meta
+): void {
+  if (tile instanceof Meta) {
+    // Handle meta tiles
+    for (const g of tile.geoms) {
+      const childContainer = new PIXI.Container();
+      const M = g.xform;
+      const matrix = new PIXI.Matrix(M[0], M[3], M[1], M[4], M[2], M[5]);
+      childContainer.setFromMatrix(matrix);
+      container.addChild(childContainer);
+      drawTilesToPixi(childContainer, g.geom);
+    }
+  } else {
+    // Handle regular shapes
+    const graphics = new PIXI.Graphics();
+    drawShapeToPixi(graphics, tile);
+    container.addChild(graphics);
+  }
+}
+
+/**
+ * Main drawing function
  */
 function draw(): void {
-  // High DPI support
-  const dpr = window.devicePixelRatio || 1;
-  
-  // Clear canvas
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
-
-  // Reset tile counters
-  resetTileCounts();
+  // Clear previous frame
+  mainContainer.removeChildren();
+  tileCount = 0;
+  visibleTileCount = 0;
 
   // Get tile iteration level
   const tileValue = tile_sel.value.replace(/[()]/g, '').split(',');
@@ -419,24 +473,53 @@ function draw(): void {
     curr_sys = buildSupertiles(curr_sys);
   }
 
-  // Setup transformation
-  ctx.save();
+  // Setup transformation matching the Canvas approach:
+  // 1. Translate to center
+  // 2. Apply tile scale
+  // 3. Apply to_screen transform
   
-  // Apply device pixel ratio scaling first
-  ctx.scale(dpr, dpr);
+  // Create a matrix that combines all three transformations
+  const matrix = new PIXI.Matrix();
   
-  ctx.translate(width / 2, height / 2);
-  ctx.scale(tileScale, tileScale);
-  ctx.transform(to_screen[0], to_screen[3], to_screen[1], to_screen[4], to_screen[2], to_screen[5]);
+  // Start with translate to center
+  matrix.translate(width / 2, height / 2);
+  
+  // Apply tile scale
+  matrix.scale(tileScale, tileScale);
+  
+  // Apply to_screen transform
+  // Canvas transform(a, b, c, d, e, f) maps to matrix [a, c, e, b, d, f] in column-major
+  // to_screen is [a, b, tx, c, d, ty]
+  // We need to append this as a matrix multiplication
+  const toScreenMatrix = new PIXI.Matrix(
+    to_screen[0], // a
+    to_screen[3], // b (from index 3)
+    to_screen[1], // c (from index 1)  
+    to_screen[4], // d
+    to_screen[2], // tx
+    to_screen[5]  // ty
+  );
+  matrix.append(toScreenMatrix);
+  
+  // Apply the combined matrix to the main container
+  mainContainer.setFromMatrix(matrix);
 
-  // Draw the pattern
-  curr_sys['Gamma'].draw(ctx, colmap, boundingBoxWidth, boundingBoxHeight);
-
-  ctx.restore();
+  // Draw the pattern directly into main container
+  drawTilesToPixi(mainContainer, curr_sys['Gamma']);
 
   // Update tile count
-  const counts = getTileCounts();
-  tile_count_label.textContent = `${counts.visible} visible / ${counts.total} total`;
+  tile_count_label.textContent = `${visibleTileCount} visible / ${tileCount} total`;
+}
+
+/**
+ * Main rendering loop
+ */
+function loop(): void {
+  if (needsRedraw) {
+    draw();
+    needsRedraw = false;
+  }
+  requestAnimationFrame(loop);
 }
 
 /**
@@ -540,29 +623,38 @@ function onTouchEnd(e: TouchEvent): void {
 function onResize(): void {
   width = window.innerWidth;
   height = window.innerHeight;
-  
-  // High DPI support: account for device pixel ratio
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
-  
+  app.renderer.resize(width, height);
   needsRedraw = true;
 }
 
 /**
  * Initialize the application
  */
-function init(): void {
-  // Create canvas
-  canvas = document.createElement('canvas');
-  ctx = canvas.getContext('2d', { alpha: false })!;
-  document.body.appendChild(canvas);
+async function init(): Promise<void> {
+  width = window.innerWidth;
+  height = window.innerHeight;
+
+  // Initialize Pixi.js Application with High DPI support
+  app = new PIXI.Application();
+  await app.init({
+    width: width,
+    height: height,
+    backgroundColor: 0xffffff,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+    antialias: true,
+  });
+
+  // Add canvas to DOM
+  document.body.appendChild(app.canvas);
+  app.canvas.style.display = 'block';
+
+  // Create main container
+  mainContainer = new PIXI.Container();
+  app.stage.addChild(mainContainer);
 
   // Resize handler
   window.addEventListener('resize', onResize);
-  onResize();
 
   // Create UI
   createUI();
@@ -571,14 +663,14 @@ function init(): void {
   sys = buildSpectreBase(true);
 
   // Event listeners
-  canvas.addEventListener('mousedown', onMouseDown);
+  app.canvas.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mousemove', onMouseMove);
   window.addEventListener('mouseup', onMouseUp);
-  canvas.addEventListener('wheel', onWheel, { passive: false });
+  app.canvas.addEventListener('wheel', onWheel, { passive: false });
 
-  canvas.addEventListener('touchstart', onTouchStart, { passive: false });
-  canvas.addEventListener('touchmove', onTouchMove, { passive: false });
-  canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+  app.canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+  app.canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  app.canvas.addEventListener('touchend', onTouchEnd, { passive: false });
 
   // Start loop
   requestAnimationFrame(loop);
