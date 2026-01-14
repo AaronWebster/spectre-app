@@ -820,6 +820,9 @@ function toggleUIVisibility() {
 }
 
 // Nesting Logic for Fabrication Mode
+// Performance Note: This function includes computationally expensive polygon offsetting
+// that can freeze the browser with high tile counts. Future optimization: Could be moved
+// to a Web Worker. See PERFORMANCE_OPTIMIZATIONS.md for details.
 function nestTiles() {
     // Use the base spectre coordinates constant
     const spectre = SPECTRE_COORDS;
