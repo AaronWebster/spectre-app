@@ -42,6 +42,8 @@ let chainCutting = false;
 
 // Tweakpane instance
 let pane: Pane;
+let explorerFolder: any; // Tweakpane FolderApi type
+let fabricationFolder: any; // Tweakpane FolderApi type
 
 // UI State (used by Tweakpane)
 const uiState = {
@@ -87,7 +89,7 @@ function createUI(): void {
   });
 
   // Explorer folder
-  const explorerFolder = pane.addFolder({
+  explorerFolder = pane.addFolder({
     title: 'Explorer',
     expanded: true,
   });
@@ -207,7 +209,7 @@ function createUI(): void {
   });
 
   // Fabrication folder
-  const fabricationFolder = pane.addFolder({
+  fabricationFolder = pane.addFolder({
     title: 'Fabrication',
     expanded: true,
   });
@@ -222,7 +224,7 @@ function createUI(): void {
     label: 'Grout (in)',
     min: 0,
     max: 1,
-    step: 0.001,
+    step: 0.01,
   }).on('change', () => {
     needsRedraw = true;
   });
@@ -231,7 +233,7 @@ function createUI(): void {
     label: 'Kerf (in)',
     min: 0,
     max: 1,
-    step: 0.001,
+    step: 0.01,
   }).on('change', () => {
     needsRedraw = true;
   });
@@ -303,16 +305,11 @@ function updateUIVisibility(): void {
   paneElement.style.display = uibox ? 'block' : 'none';
 
   // Show/hide folders based on mode
-  const allFolders = pane.children;
-  allFolders.forEach((child) => {
-    if ('title' in child) {
-      if (child.title === 'Explorer') {
-        child.hidden = fabricationMode;
-      } else if (child.title === 'Fabrication') {
-        child.hidden = !fabricationMode;
-      }
-    }
-  });
+  // We track the folder references for better type safety
+  if (explorerFolder && fabricationFolder) {
+    explorerFolder.hidden = fabricationMode;
+    fabricationFolder.hidden = !fabricationMode;
+  }
 }
 
 /**
