@@ -4,6 +4,24 @@
 const DEFAULT_SCALE = 20;
 const PARALLEL_LINE_TOLERANCE = 1e-8;
 
+// Base Spectre tile coordinates (unit size)
+const SPECTRE_COORDS = [
+    {x: 0, y: 0},
+    {x: 1.0, y: 0.0},
+    {x: 1.5, y: -0.8660254037844386},
+    {x: 2.366025403784439, y: -0.36602540378443865},
+    {x: 2.366025403784439, y: 0.6339745962155614},
+    {x: 3.366025403784439, y: 0.6339745962155614},
+    {x: 3.866025403784439, y: 1.5},
+    {x: 3.0, y: 2.0},
+    {x: 2.133974596215561, y: 1.5},
+    {x: 1.6339745962155614, y: 2.3660254037844393},
+    {x: 0.6339745962155614, y: 2.3660254037844393},
+    {x: -0.3660254037844386, y: 2.3660254037844393},
+    {x: -0.866025403784439, y: 1.5},
+    {x: 0.0, y: 1.0}
+];
+
 const ident = [1,0,0,0,1,0];
 let to_screen = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0];
 let lw_scale = 1;
@@ -27,10 +45,21 @@ let tileScale = 1;
 let boundingBoxWidth = 100;
 let boundingBoxHeight = 100;
 
+// Fabrication Mode State
+let fabricationMode = false;
+let nestedShapes = [];
+let fabYield = 0;
+let stockWidth = 24;
+let stockHeight = 24;
+let stockMargin = 0.25;
+let chainCutting = false;
+
 // UI Elements
 let tile_sel, shape_sel, colscheme_sel, tile_count_label;
 let tileScaleInput, boundingBoxWidthInput, boundingBoxHeightInput;
 let groutInput, kerfInput;
+let mode_sel, stockWidthInput, stockHeightInput, stockMarginInput, chainCuttingCheckbox;
+let previewNestButton, fabYieldLabel;
 
 const tile_names = [ 
 	'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi',
@@ -333,22 +362,8 @@ class Meta {
 // Builders
 function buildSpectreBase( curved )
 {
-	const spectre = [
-		pt(0, 0),
-		pt(1.0, 0.0),
-		pt(1.5, -0.8660254037844386),
-		pt(2.366025403784439, -0.36602540378443865),
-		pt(2.366025403784439, 0.6339745962155614),
-		pt(3.366025403784439, 0.6339745962155614),
-		pt(3.866025403784439, 1.5),
-		pt(3.0, 2.0),
-		pt(2.133974596215561, 1.5),
-		pt(1.6339745962155614, 2.3660254037844393),
-		pt(0.6339745962155614, 2.3660254037844393),
-		pt(-0.3660254037844386, 2.3660254037844393),
-		pt(-0.866025403784439, 1.5),
-		pt(0.0, 1.0) 
-	];
+	// Use the constant for spectre coordinates
+	const spectre = SPECTRE_COORDS.map(p => pt(p.x, p.y));
 
 	const spectre_keys = [
 		spectre[3], spectre[5], spectre[7], spectre[11]
@@ -539,9 +554,43 @@ function buildSupertiles( sys )
 
 // UI Creation
 function createUI() {
+    // Mode Selection (at the very top)
+    addLabel('Mode', 10, 10);
+    mode_sel = addSelect(10, 30, ['Spectre Explorer', 'Fabrication'], 'Spectre Explorer');
+    mode_sel.addEventListener('change', () => {
+        fabricationMode = (mode_sel.value === 'Fabrication');
+        if (fabricationMode) {
+            // Switch to straight edges for fabrication
+            sys = buildSpectreBase(false);
+            to_screen = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0];
+            lw_scale = 1;
+            // Show/hide relevant UI elements
+            toggleUIVisibility();
+        } else {
+            // Restore to whatever was selected
+            const s = shape_sel.value;
+            if( s == 'Hexagons' ) {
+                sys = buildHexBase();
+            } else if( s == 'Turtles in Hats' ) {
+                sys = buildHatTurtleBase( true );
+            } else if( s == 'Hats in Turtles' ) {
+                sys = buildHatTurtleBase( false );
+            } else if( s == 'Spectres' ) {
+                sys = buildSpectreBase( true );
+            } else {
+                sys = buildSpectreBase( false );
+            }
+            toggleUIVisibility();
+        }
+        needsRedraw = true;
+    });
+
+    // --- Spectre Explorer UI Section ---
+    addLabel('--- Explorer ---', 10, 65);
+    
     // Shapes Label and Select
-    addLabel('Shapes', 10, 10);
-    shape_sel = addSelect(10, 30, [
+    addLabel('Shapes', 10, 85);
+    shape_sel = addSelect(10, 105, [
         'Tile(1,1)', 'Spectres', 'Hexagons', 
         'Turtles in Hats', 'Hats in Turtles'
     ], 'Tile(1,1)'); // Default
@@ -565,25 +614,25 @@ function createUI() {
     });
 
     // Subst Button
-    const subst_btn = addButton('Build Supertiles', 10, 60, () => {
+    const subst_btn = addButton('Build Supertiles', 10, 135, () => {
         sys = buildSupertiles( sys );
         needsRedraw = true;
     });
 
     // Category Label and Select
-    addLabel('Category', 10, 100);
-    tile_sel = addSelect(10, 120, tile_names, 'Delta');
+    addLabel('Category', 10, 175);
+    tile_sel = addSelect(10, 195, tile_names, 'Delta');
     tile_sel.addEventListener('change', () => { needsRedraw = true; });
 
     // Colors Label and Select
-    addLabel('Colours', 10, 150);
-    colscheme_sel = addSelect(10, 170, [
+    addLabel('Colours', 10, 225);
+    colscheme_sel = addSelect(10, 245, [
         'Figure 5.3', 'Mystics', 'Bright'
     ], 'Figure 5.3');
     colscheme_sel.addEventListener('change', () => { needsRedraw = true; });
 
     // Save PNG
-    addButton('Save PNG', 10, 210, () => {
+    addButton('Save PNG', 10, 285, () => {
         uibox = false;
         draw();
         const link = document.createElement('a');
@@ -595,7 +644,7 @@ function createUI() {
     });
 
     // Save SVG
-    addButton('Save SVG', 10, 240, () => {
+    addButton('Save SVG', 10, 315, () => {
         const stream = [];
         stream.push( `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">` );
 		stream.push( `<g transform="translate(${width/2},${height/2})">` );
@@ -612,40 +661,320 @@ function createUI() {
         link.click();
     });
     
-    // --- Manufacturing UI Section ---
-    addLabel('--- Manufacturing ---', 10, 275);
-    
-    addLabel('Grout (in):', 10, 295);
-    groutInput = addNumberInput(80, 292, 0.125, 0, 1, 0.001, () => {});
-
-    addLabel('Kerf (in):', 10, 320);
-    kerfInput = addNumberInput(80, 317, 0.040, 0, 1, 0.001, () => {});
-
-    addButton('Export DXF', 10, 345, () => {
-        startExport();
-    });
-
-    // --- View Controls ---
-    addLabel('Tile Scale', 10, 380);
-    tileScaleInput = addNumberInput(10, 400, tileScale, 0.1, 50, 0.1, (value) => {
+    // Tile Scale (for Explorer)
+    addLabel('Tile Scale', 10, 350);
+    tileScaleInput = addNumberInput(10, 370, tileScale, 0.1, 50, 0.1, (value) => {
         tileScale = value;
         needsRedraw = true;
     });
     
     // Tile Count Label
-    tile_count_label = addLabel('Tiles: 0', 80, 400);
+    tile_count_label = addLabel('Tiles: 0', 80, 370);
 
-    addLabel('Bounding Box', 10, 430);
-    addLabel('W:', 10, 450);
-    boundingBoxWidthInput = addNumberInput(30, 447, boundingBoxWidth, 10, 1000, 10, (value) => {
+    addLabel('Bounding Box', 10, 400);
+    addLabel('W:', 10, 420);
+    boundingBoxWidthInput = addNumberInput(30, 417, boundingBoxWidth, 10, 1000, 10, (value) => {
         boundingBoxWidth = value;
         needsRedraw = true;
     });
-    addLabel('H:', 80, 450);
-    boundingBoxHeightInput = addNumberInput(100, 447, boundingBoxHeight, 10, 1000, 10, (value) => {
+    addLabel('H:', 80, 420);
+    boundingBoxHeightInput = addNumberInput(100, 417, boundingBoxHeight, 10, 1000, 10, (value) => {
         boundingBoxHeight = value;
         needsRedraw = true;
     });
+
+    // --- Fabrication UI Section ---
+    addLabel('--- Fabrication ---', 10, 455);
+    
+    // Stock Dimensions
+    addLabel('Stock (in):', 10, 475);
+    addLabel('W:', 10, 495);
+    stockWidthInput = addNumberInput(30, 492, stockWidth, 1, 100, 0.1, (value) => {
+        stockWidth = value;
+        if (fabricationMode) needsRedraw = true;
+    });
+    addLabel('H:', 80, 495);
+    stockHeightInput = addNumberInput(100, 492, stockHeight, 1, 100, 0.1, (value) => {
+        stockHeight = value;
+        if (fabricationMode) needsRedraw = true;
+    });
+
+    // Margin
+    addLabel('Margin (in):', 10, 520);
+    stockMarginInput = addNumberInput(80, 517, stockMargin, 0, 5, 0.05, (value) => {
+        stockMargin = value;
+        if (fabricationMode) needsRedraw = true;
+    });
+
+    // Cut Settings
+    addLabel('Cut Settings:', 10, 545);
+    addLabel('Grout (in):', 10, 565);
+    groutInput = addNumberInput(80, 562, 0.125, 0, 1, 0.001, () => {
+        if (fabricationMode) needsRedraw = true;
+    });
+
+    addLabel('Kerf (in):', 10, 590);
+    kerfInput = addNumberInput(80, 587, 0.040, 0, 1, 0.001, () => {
+        if (fabricationMode) needsRedraw = true;
+    });
+
+    // Chain Cutting
+    addLabel('Chain Cut:', 10, 615);
+    chainCuttingCheckbox = addCheckbox(80, 615, chainCutting, (value) => {
+        chainCutting = value;
+        if (fabricationMode) needsRedraw = true;
+    });
+
+    // Preview Nest Button
+    previewNestButton = addButton('Preview Nest', 10, 640, () => {
+        nestTiles();
+        needsRedraw = true;
+    });
+
+    // Yield Label
+    fabYieldLabel = addLabel('Yield: 0', 10, 670);
+
+    // Export DXF
+    addButton('Export DXF', 10, 695, () => {
+        if (fabricationMode) {
+            exportFabricationDXF();
+        } else {
+            startExport();
+        }
+    });
+
+    // Initialize visibility
+    toggleUIVisibility();
+}
+
+// Toggle UI visibility based on mode
+function toggleUIVisibility() {
+    // Explorer-only elements
+    const explorerElements = [
+        shape_sel, tile_sel, colscheme_sel,
+        tileScaleInput, boundingBoxWidthInput, boundingBoxHeightInput
+    ];
+    
+    // Fabrication-only elements
+    const fabricationElements = [
+        stockWidthInput, stockHeightInput, stockMarginInput,
+        chainCuttingCheckbox, previewNestButton, fabYieldLabel
+    ];
+    
+    // Get all labels to manage their visibility
+    const labels = document.querySelectorAll('span');
+    
+    if (fabricationMode) {
+        // Show fabrication, hide explorer
+        explorerElements.forEach(el => {
+            if (el && el.parentElement) el.style.display = 'none';
+        });
+        fabricationElements.forEach(el => {
+            if (el && el.parentElement) el.style.display = '';
+        });
+        
+        // Update label visibility
+        labels.forEach(label => {
+            const text = label.innerText;
+            if (text.includes('Shapes') || text.includes('Category') || 
+                text.includes('Colours') || text.includes('Tile Scale') || 
+                text.includes('Bounding Box') || (text.includes('W:') && label.style.top === '420px') ||
+                (text.includes('H:') && label.style.top === '420px') ||
+                text.includes('--- Explorer ---')) {
+                label.style.display = 'none';
+            } else if (text.includes('--- Fabrication ---') || text.includes('Stock') ||
+                      text.includes('Margin') || text.includes('Cut Settings') ||
+                      text.includes('Grout') || text.includes('Kerf') || 
+                      text.includes('Chain Cut') || text.includes('Yield')) {
+                label.style.display = '';
+            }
+            }
+        });
+        
+        tile_count_label.style.display = 'none';
+    } else {
+        // Show explorer, hide fabrication
+        explorerElements.forEach(el => {
+            if (el && el.parentElement) el.style.display = '';
+        });
+        fabricationElements.forEach(el => {
+            if (el && el.parentElement) el.style.display = 'none';
+        });
+        
+        // Update label visibility
+        labels.forEach(label => {
+            const text = label.innerText;
+            if (text.includes('Shapes') || text.includes('Category') || 
+                text.includes('Colours') || text.includes('Tile Scale') || 
+                text.includes('Bounding Box') || text.includes('Tiles:') ||
+                text.includes('--- Explorer ---')) {
+                label.style.display = '';
+            } else if (text.includes('Stock (in)') || text.includes('Margin (in)') ||
+                      text.includes('Chain Cut') || text.includes('Yield') ||
+                      text.includes('--- Fabrication ---')) {
+                label.style.display = 'none';
+            }
+        });
+        
+        tile_count_label.style.display = '';
+    }
+}
+
+// Nesting Logic for Fabrication Mode
+function nestTiles() {
+    // Use the base spectre coordinates constant
+    const spectre = SPECTRE_COORDS;
+    
+    // Scale the tile by tileScale
+    const scaledTile = spectre.map(p => pt(p.x * tileScale, p.y * tileScale));
+    
+    // Get grout and kerf values
+    const grout = parseFloat(groutInput.value);
+    const kerf = parseFloat(kerfInput.value);
+    
+    // Calculate erosion: (Grout - Kerf) / 2
+    const erosion = (grout - kerf) / 2.0;
+    
+    // Apply erosion (negative for inward offset)
+    const erodedTile = offsetPolygon(scaledTile, -erosion);
+    
+    // Calculate tile bounding box
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of erodedTile) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+    }
+    const tileWidth = maxX - minX;
+    const tileHeight = maxY - minY;
+    
+    // Calculate usable stock area
+    const usableWidth = stockWidth - 2 * stockMargin;
+    const usableHeight = stockHeight - 2 * stockMargin;
+    
+    // Calculate how many tiles fit
+    const tilesX = Math.floor(usableWidth / tileWidth);
+    const tilesY = Math.floor(usableHeight / tileHeight);
+    
+    // Generate nested shapes
+    nestedShapes = [];
+    for (let row = 0; row < tilesY; row++) {
+        for (let col = 0; col < tilesX; col++) {
+            // Calculate position (starting from margin, placing tiles in a grid)
+            const offsetX = stockMargin + col * tileWidth - minX;
+            const offsetY = stockMargin + row * tileHeight - minY;
+            
+            // Translate tile
+            const translatedTile = erodedTile.map(p => pt(p.x + offsetX, p.y + offsetY));
+            nestedShapes.push(translatedTile);
+        }
+    }
+    
+    // Update yield count
+    fabYield = nestedShapes.length;
+    if (fabYieldLabel) {
+        fabYieldLabel.innerText = `Yield: ${fabYield}`;
+    }
+    
+    // Apply chain cutting if enabled
+    if (chainCutting && nestedShapes.length > 1) {
+        nestedShapes = addBridges(nestedShapes);
+    }
+}
+
+// Add bridges between tiles for chain cutting
+function addBridges(shapes) {
+    if (shapes.length === 0) return shapes;
+    
+    const result = [];
+    
+    for (let i = 0; i < shapes.length; i++) {
+        result.push(shapes[i]);
+        
+        // Add bridge to next tile
+        if (i < shapes.length - 1) {
+            const currentTile = shapes[i];
+            const nextTile = shapes[i + 1];
+            
+            // Find closest points between tiles
+            const endPoint = currentTile[currentTile.length - 1];
+            const startPoint = nextTile[0];
+            
+            // Create a bridge line (open polyline)
+            result.push([endPoint, startPoint]);
+        }
+    }
+    
+    return result;
+}
+
+// Export DXF for Fabrication Mode
+function exportFabricationDXF() {
+    if (nestedShapes.length === 0) {
+        alert('Please click "Preview Nest" first to generate tiles.');
+        return;
+    }
+    
+    let d = "";
+    // Header
+    d += "0\nSECTION\n2\nHEADER\n";
+    d += "9\n$INSUNITS\n70\n1\n"; // 1 = inches
+    d += "0\nENDSEC\n";
+    d += "0\nSECTION\n2\nTABLES\n";
+    
+    // Layer table
+    d += "0\nTABLE\n2\nLAYER\n";
+    d += "0\nLAYER\n2\nSTOCK\n70\n0\n62\n7\n6\nCONTINUOUS\n";
+    d += "0\nLAYER\n2\nCUT_PATH\n70\n0\n62\n1\n6\nCONTINUOUS\n";
+    d += "0\nENDTAB\n";
+    d += "0\nENDSEC\n";
+    
+    // Entities
+    d += "0\nSECTION\n2\nENTITIES\n";
+    
+    // Stock rectangle
+    d += "0\nLWPOLYLINE\n";
+    d += "8\nSTOCK\n"; // Layer
+    d += "62\n7\n"; // Color white
+    d += "90\n4\n"; // 4 vertices
+    d += "70\n1\n"; // Closed
+    d += `10\n0\n20\n0\n`;
+    d += `10\n${stockWidth.toFixed(4)}\n20\n0\n`;
+    d += `10\n${stockWidth.toFixed(4)}\n20\n${stockHeight.toFixed(4)}\n`;
+    d += `10\n0\n20\n${stockHeight.toFixed(4)}\n`;
+    
+    // Cut paths
+    for (const shape of nestedShapes) {
+        d += "0\nLWPOLYLINE\n";
+        d += "8\nCUT_PATH\n"; // Layer
+        d += "62\n1\n"; // Color red
+        d += "90\n" + shape.length + "\n"; // Number of vertices
+        
+        // Check if this is a bridge (2 points) or a tile (many points)
+        if (shape.length === 2) {
+            d += "70\n0\n"; // Open polyline (bridge)
+        } else {
+            d += "70\n1\n"; // Closed polyline (tile)
+        }
+        
+        for (const p of shape) {
+            d += "10\n" + p.x.toFixed(4) + "\n";
+            d += "20\n" + p.y.toFixed(4) + "\n";
+        }
+    }
+    
+    d += "0\nENDSEC\n0\nEOF\n";
+    
+    // Trigger Download
+    const blob = new Blob([d], {type: "application/dxf"});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = "spectre_fabrication.dxf";
+    link.click();
+    
+    alert(`Exported ${fabYield} tiles to DXF with stock dimensions ${stockWidth}x${stockHeight} inches.`);
 }
 
 function addLabel(text, x, y) {
@@ -708,6 +1037,20 @@ function addNumberInput(x, y, defaultValue, min, max, step, onchange) {
         if (!isNaN(value)) {
             onchange(value);
         }
+    });
+    document.body.appendChild(el);
+    return el;
+}
+
+function addCheckbox(x, y, defaultValue, onchange) {
+    const el = document.createElement('input');
+    el.type = 'checkbox';
+    el.checked = defaultValue;
+    el.style.position = 'absolute';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.addEventListener('change', (e) => {
+        onchange(e.target.checked);
     });
     document.body.appendChild(el);
     return el;
@@ -861,30 +1204,95 @@ function draw() {
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, width, height);
 
-    ctx.save();
-    // Center logic
-    ctx.translate(width/2, height/2);
-    // Apply tile scale
-    ctx.scale(tileScale, tileScale);
-    // Apply to_screen
-    ctx.transform(to_screen[0], to_screen[3], to_screen[1], to_screen[4], to_screen[2], to_screen[5]);
+    if (fabricationMode) {
+        // Fabrication Mode Rendering
+        ctx.save();
+        
+        // Center the stock on screen
+        ctx.translate(width/2, height/2);
+        
+        // Scale to fit stock nicely on screen (use a reasonable scale)
+        const scaleX = (width * 0.6) / stockWidth;
+        const scaleY = (height * 0.6) / stockHeight;
+        const fabScale = Math.min(scaleX, scaleY);
+        ctx.scale(fabScale, fabScale);
+        
+        // Offset to center the stock
+        ctx.translate(-stockWidth/2, -stockHeight/2);
+        
+        // Draw stock rectangle
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 / fabScale;
+        ctx.strokeRect(0, 0, stockWidth, stockHeight);
+        
+        // Draw margin guides (dashed)
+        ctx.strokeStyle = 'gray';
+        ctx.setLineDash([0.1, 0.1]);
+        ctx.lineWidth = 1 / fabScale;
+        ctx.strokeRect(stockMargin, stockMargin, 
+                      stockWidth - 2 * stockMargin, 
+                      stockHeight - 2 * stockMargin);
+        ctx.setLineDash([]);
+        
+        // Draw nested shapes
+        for (const shape of nestedShapes) {
+            if (shape.length === 2) {
+                // This is a bridge line
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 1 / fabScale;
+                ctx.beginPath();
+                ctx.moveTo(shape[0].x, shape[0].y);
+                ctx.lineTo(shape[1].x, shape[1].y);
+                ctx.stroke();
+            } else {
+                // This is a tile
+                ctx.fillStyle = 'rgba(163, 150, 133, 0.5)';
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 1 / fabScale;
+                ctx.beginPath();
+                ctx.moveTo(shape[0].x, shape[0].y);
+                for (let i = 1; i < shape.length; i++) {
+                    ctx.lineTo(shape[i].x, shape[i].y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+        
+        ctx.restore();
+    } else {
+        // Explorer Mode Rendering (original)
+        ctx.save();
+        // Center logic
+        ctx.translate(width/2, height/2);
+        // Apply tile scale
+        ctx.scale(tileScale, tileScale);
+        // Apply to_screen
+        ctx.transform(to_screen[0], to_screen[3], to_screen[1], to_screen[4], to_screen[2], to_screen[5]);
 
-    // Handle Color Map
-    const s = colscheme_sel.value;
-	if( s == 'Bright' ) {
-		colmap = colmap_orig;
-	} else if( s == 'Mystics' ) {
-		colmap = colmap_mystics;
-	} else {
-		colmap = colmap53;
-	}
+        // Handle Color Map
+        const s = colscheme_sel.value;
+        if( s == 'Bright' ) {
+            colmap = colmap_orig;
+        } else if( s == 'Mystics' ) {
+            colmap = colmap_mystics;
+        } else {
+            colmap = colmap53;
+        }
 
-    // Draw System
-    if(sys && sys[tile_sel.value]) {
-        sys[tile_sel.value].draw(ctx);
+        // Draw System
+        if(sys && sys[tile_sel.value]) {
+            sys[tile_sel.value].draw(ctx);
+        }
+        
+        ctx.restore();
+
+        // Update tile count display
+        if(tile_count_label) {
+            tile_count_label.innerText = `Tiles: ${visibleTileCount}`;
+        }
     }
-    
-    ctx.restore();
 
     // UI Box
     if(uibox) {
@@ -892,13 +1300,8 @@ function draw() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 0.5;
-        ctx.fillRect(5, 5, 135, 480); // Updated height for manufacturing controls
-        ctx.strokeRect(5, 5, 135, 480);
-    }
-    
-    // Update tile count display
-    if(tile_count_label) {
-        tile_count_label.innerText = `Tiles: ${visibleTileCount}`;
+        ctx.fillRect(5, 5, 135, 730); // Updated height for fabrication controls
+        ctx.strokeRect(5, 5, 135, 730);
     }
 }
 
