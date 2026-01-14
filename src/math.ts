@@ -37,29 +37,50 @@ export function pt(x: number, y: number): Point {
 }
 
 /**
+ * Convert from row-major TransformMatrix format [a, b, tx, c, d, ty]
+ * to column-major gl-matrix mat2d format [a, c, b, d, tx, ty]
+ */
+function toGLMatrix(T: TransformMatrix): mat2d {
+  return [T[0], T[3], T[1], T[4], T[2], T[5]] as mat2d;
+}
+
+/**
+ * Convert from column-major gl-matrix mat2d format [a, c, b, d, tx, ty]
+ * to row-major TransformMatrix format [a, b, tx, c, d, ty]
+ */
+function fromGLMatrix(m: mat2d): TransformMatrix {
+  return [m[0], m[2], m[4], m[1], m[3], m[5]];
+}
+
+/**
  * Invert an affine transformation matrix
  * Uses gl-matrix for optimized matrix operations
  * 
- * Note: TransformMatrix [a, b, c, d, e, f] is compatible with gl-matrix mat2d format.
- * Both represent 2D affine transformations as 6-element arrays.
+ * Note: TransformMatrix uses row-major format [a, b, tx, c, d, ty]
+ * but gl-matrix mat2d uses column-major format [a, c, b, d, tx, ty].
+ * We convert between formats for gl-matrix operations.
  */
 export function inv(T: TransformMatrix): TransformMatrix {
+  const glMatrix = toGLMatrix(T);
   const result = mat2d.create();
-  mat2d.invert(result, T as mat2d);
-  return result as TransformMatrix;
+  mat2d.invert(result, glMatrix);
+  return fromGLMatrix(result);
 }
 
 /**
  * Multiply two affine transformation matrices
  * Uses gl-matrix for optimized matrix operations
  * 
- * Note: TransformMatrix [a, b, c, d, e, f] is compatible with gl-matrix mat2d format.
- * Both represent 2D affine transformations as 6-element arrays.
+ * Note: TransformMatrix uses row-major format [a, b, tx, c, d, ty]
+ * but gl-matrix mat2d uses column-major format [a, c, b, d, tx, ty].
+ * We convert between formats for gl-matrix operations.
  */
 export function mul(A: TransformMatrix, B: TransformMatrix): TransformMatrix {
+  const glA = toGLMatrix(A);
+  const glB = toGLMatrix(B);
   const result = mat2d.create();
-  mat2d.multiply(result, A as mat2d, B as mat2d);
-  return result as TransformMatrix;
+  mat2d.multiply(result, glA, glB);
+  return fromGLMatrix(result);
 }
 
 /**
