@@ -1,6 +1,7 @@
 // mainPixi.ts - Entry point using Pixi.js renderer
 
 import * as PIXI from 'pixi.js';
+import { Pane } from 'tweakpane';
 import { TransformMatrix, ColorMap } from './types';
 import { buildSpectreBase, buildHatTurtleBase, buildHexBase, buildSupertiles } from './generatorPixi';
 import { PixiShape, PixiCurvyShape, PixiMeta } from './pixiShapes';
@@ -39,335 +40,284 @@ let stockHeight = 24;
 let stockMargin = 0.25;
 let chainCutting = false;
 
-// UI Elements
-let tile_sel: HTMLSelectElement;
-let shape_sel: HTMLSelectElement;
-let colscheme_sel: HTMLSelectElement;
-let tile_count_label: HTMLDivElement;
-let groutInput: HTMLInputElement;
-let kerfInput: HTMLInputElement;
-let mode_sel: HTMLSelectElement;
-let stockWidthInput: HTMLInputElement;
-let stockHeightInput: HTMLInputElement;
-let stockMarginInput: HTMLInputElement;
-let chainCuttingCheckbox: HTMLInputElement;
-let previewNestButton: HTMLButtonElement;
-let fabYieldLabel: HTMLDivElement;
+// Tweakpane instance
+let pane: Pane;
+
+// UI State (used by Tweakpane)
+const uiState = {
+  mode: 'Spectre Explorer',
+  tile: '(1,1)',
+  shape: 'Spectres',
+  colorScheme: 'Paper Fig 5.3',
+  tileScale: 1,
+  boundingBoxWidth: 100,
+  boundingBoxHeight: 100,
+  tileCount: '0 visible / 0 total',
+  grout: 0.125,
+  kerf: 0.05,
+  stockWidth: 24,
+  stockHeight: 24,
+  stockMargin: 0.25,
+  chainCutting: false,
+  yield: '0%'
+};
 
 let colmap: ColorMap = colmap53;
 
 /**
- * Add a label to the UI
- */
-function addLabel(text: string, x: number, y: number): HTMLDivElement {
-  const el = document.createElement('div');
-  el.textContent = text;
-  el.style.position = 'absolute';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.color = 'white';
-  el.style.fontSize = '12px';
-  el.style.fontFamily = 'sans-serif';
-  el.style.backgroundColor = 'rgba(0,0,0,0.7)';
-  el.style.padding = '2px 5px';
-  el.style.borderRadius = '3px';
-  el.style.pointerEvents = 'none';
-  el.style.zIndex = '1000';
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Add a select dropdown to the UI
- */
-function addSelect(
-  x: number,
-  y: number,
-  options: string[],
-  def: string
-): HTMLSelectElement {
-  const el = document.createElement('select');
-  el.style.position = 'absolute';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.backgroundColor = 'rgba(255,255,255,0.9)';
-  el.style.border = '1px solid #ccc';
-  el.style.padding = '4px';
-  el.style.fontSize = '12px';
-  el.style.borderRadius = '3px';
-  el.style.fontFamily = 'sans-serif';
-  el.style.zIndex = '1000';
-
-  for (const opt of options) {
-    const option = document.createElement('option');
-    option.value = opt;
-    option.textContent = opt;
-    if (opt === def) {
-      option.selected = true;
-    }
-    el.appendChild(option);
-  }
-
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Add a button to the UI
- */
-function addButton(
-  text: string,
-  x: number,
-  y: number,
-  onclick: () => void
-): HTMLButtonElement {
-  const el = document.createElement('button');
-  el.textContent = text;
-  el.style.position = 'absolute';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.backgroundColor = 'rgba(255,255,255,0.9)';
-  el.style.border = '1px solid #ccc';
-  el.style.padding = '4px 8px';
-  el.style.fontSize = '12px';
-  el.style.borderRadius = '3px';
-  el.style.cursor = 'pointer';
-  el.style.fontFamily = 'sans-serif';
-  el.style.zIndex = '1000';
-  el.addEventListener('click', onclick);
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Add a number input to the UI
- */
-function addNumberInput(
-  x: number,
-  y: number,
-  defaultValue: number,
-  min: number,
-  max: number,
-  step: number,
-  onchange: (value: number) => void
-): HTMLInputElement {
-  const el = document.createElement('input');
-  el.type = 'number';
-  el.value = defaultValue.toString();
-  el.min = min.toString();
-  el.max = max.toString();
-  el.step = step.toString();
-  el.style.position = 'absolute';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.width = '70px';
-  el.style.backgroundColor = 'rgba(255,255,255,0.9)';
-  el.style.border = '1px solid #ccc';
-  el.style.padding = '4px';
-  el.style.fontSize = '12px';
-  el.style.borderRadius = '3px';
-  el.style.fontFamily = 'sans-serif';
-  el.style.zIndex = '1000';
-  el.addEventListener('change', (e) => {
-    onchange(parseFloat((e.target as HTMLInputElement).value));
-  });
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Add a checkbox to the UI
- */
-function addCheckbox(
-  x: number,
-  y: number,
-  defaultValue: boolean,
-  onchange: (checked: boolean) => void
-): HTMLInputElement {
-  const el = document.createElement('input');
-  el.type = 'checkbox';
-  el.checked = defaultValue;
-  el.style.position = 'absolute';
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.zIndex = '1000';
-  el.addEventListener('change', (e) => {
-    onchange((e.target as HTMLInputElement).checked);
-  });
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Create the UI controls
+ * Create the UI controls using Tweakpane
  */
 function createUI(): void {
+  pane = new Pane({
+    title: 'Spectre Controls',
+    expanded: true,
+  });
+
   // Mode Selection
-  addLabel('Mode', 10, 10);
-  mode_sel = addSelect(10, 30, ['Spectre Explorer', 'Fabrication'], 'Spectre Explorer');
-  mode_sel.addEventListener('change', () => {
-    fabricationMode = mode_sel.value === 'Fabrication';
-    toggleUIVisibility();
+  pane.addBinding(uiState, 'mode', {
+    label: 'Mode',
+    options: {
+      'Spectre Explorer': 'Spectre Explorer',
+      'Fabrication': 'Fabrication',
+    },
+  }).on('change', (ev) => {
+    fabricationMode = ev.value === 'Fabrication';
+    updateUIVisibility();
     needsRedraw = true;
   });
 
+  // Explorer folder
+  const explorerFolder = pane.addFolder({
+    title: 'Explorer',
+    expanded: true,
+  });
+
   // Tile Selection
-  addLabel('Tile', 10, 70);
-  const iterations = ['(1,1)'];
+  const tileOptions: Record<string, string> = { '(1,1)': '(1,1)' };
   for (let i = 2; i < 8; i++) {
-    iterations.push(`(${i},${i})`);
+    tileOptions[`(${i},${i})`] = `(${i},${i})`;
   }
-  tile_sel = addSelect(10, 90, iterations, '(1,1)');
-  tile_sel.addEventListener('change', () => {
+  explorerFolder.addBinding(uiState, 'tile', {
+    label: 'Tile',
+    options: tileOptions,
+  }).on('change', () => {
     needsRedraw = true;
   });
 
   // Shape Selection
-  addLabel('Shape', 10, 130);
-  shape_sel = addSelect(10, 150, ['Spectres', 'Tile(1,1)', 'Hat', 'Turtle', 'Hexagons'], 'Spectres');
-  shape_sel.addEventListener('change', () => {
-    if (shape_sel.value === 'Spectres') {
+  explorerFolder.addBinding(uiState, 'shape', {
+    label: 'Shape',
+    options: {
+      'Spectres': 'Spectres',
+      'Tile(1,1)': 'Tile(1,1)',
+      'Hat': 'Hat',
+      'Turtle': 'Turtle',
+      'Hexagons': 'Hexagons',
+    },
+  }).on('change', (ev) => {
+    if (ev.value === 'Spectres') {
       sys = buildSpectreBase(true);
-    } else if (shape_sel.value === 'Tile(1,1)') {
+    } else if (ev.value === 'Tile(1,1)') {
       sys = buildSpectreBase(false);
-    } else if (shape_sel.value === 'Hat') {
+    } else if (ev.value === 'Hat') {
       sys = buildHatTurtleBase(true);
-    } else if (shape_sel.value === 'Turtle') {
+    } else if (ev.value === 'Turtle') {
       sys = buildHatTurtleBase(false);
-    } else if (shape_sel.value === 'Hexagons') {
+    } else if (ev.value === 'Hexagons') {
       sys = buildHexBase();
     }
     needsRedraw = true;
   });
 
   // Color Scheme
-  addLabel('Color Scheme', 10, 190);
-  colscheme_sel = addSelect(10, 210, ['Paper Fig 5.3', 'Original', 'Mystic'], 'Paper Fig 5.3');
-  colscheme_sel.addEventListener('change', () => {
-    if (colscheme_sel.value === 'Paper Fig 5.3') {
+  explorerFolder.addBinding(uiState, 'colorScheme', {
+    label: 'Colors',
+    options: {
+      'Figure 5.3': 'Paper Fig 5.3',
+      'Original': 'Original',
+      'Mystic': 'Mystic',
+    },
+  }).on('change', (ev) => {
+    if (ev.value === 'Paper Fig 5.3') {
       colmap = colmap53;
-    } else if (colscheme_sel.value === 'Original') {
+    } else if (ev.value === 'Original') {
       colmap = colmap_orig;
-    } else if (colscheme_sel.value === 'Mystic') {
+    } else if (ev.value === 'Mystic') {
       colmap = colmap_mystics;
     }
     needsRedraw = true;
   });
 
-  // Tile Count
-  addLabel('Tiles', 10, 250);
-  tile_count_label = addLabel('0 visible / 0 total', 10, 270);
+  // Tile Count (monitor only)
+  explorerFolder.addBinding(uiState, 'tileCount', {
+    label: 'Tiles',
+    readonly: true,
+  });
 
   // Tile Scale
-  addLabel('Tile Scale', 10, 310);
-  addNumberInput(10, 330, tileScale, 0.1, 10, 0.1, (val) => {
-    tileScale = val;
+  explorerFolder.addBinding(uiState, 'tileScale', {
+    label: 'Tile Scale',
+    min: 0.1,
+    max: 10,
+    step: 0.1,
+  }).on('change', (ev) => {
+    tileScale = ev.value;
     needsRedraw = true;
   });
 
-  // Bounding Box Controls
-  addLabel('Bounding Box Width', 10, 370);
-  addNumberInput(10, 390, boundingBoxWidth, 10, 1000, 10, (val) => {
-    boundingBoxWidth = val;
+  // Bounding Box
+  const boundingBoxFolder = explorerFolder.addFolder({
+    title: 'Bounding Box',
+    expanded: false,
+  });
+
+  boundingBoxFolder.addBinding(uiState, 'boundingBoxWidth', {
+    label: 'Width',
+    min: 10,
+    max: 1000,
+    step: 10,
+  }).on('change', (ev) => {
+    boundingBoxWidth = ev.value;
     needsRedraw = true;
   });
 
-  addLabel('Bounding Box Height', 10, 430);
-  addNumberInput(10, 450, boundingBoxHeight, 10, 1000, 10, (val) => {
-    boundingBoxHeight = val;
+  boundingBoxFolder.addBinding(uiState, 'boundingBoxHeight', {
+    label: 'Height',
+    min: 10,
+    max: 1000,
+    step: 10,
+  }).on('change', (ev) => {
+    boundingBoxHeight = ev.value;
     needsRedraw = true;
   });
 
-  // Export Button
-  addButton('Export SVG', 10, 490, () => {
+  // Export SVG Button
+  explorerFolder.addButton({
+    title: 'Export SVG',
+  }).on('click', () => {
     exportSVG();
   });
 
-  // Hide/Show UI
-  addButton('Toggle UI', 10, 530, () => {
+  // Toggle UI Button
+  explorerFolder.addButton({
+    title: 'Toggle UI',
+  }).on('click', () => {
     uibox = !uibox;
-    toggleUIVisibility();
+    updateUIVisibility();
   });
 
-  // Fabrication-specific UI (initially hidden)
-  addLabel('Grout (inches)', 10, 570);
-  groutInput = addNumberInput(10, 590, 0.125, 0, 1, 0.125, () => {
+  // Fabrication folder
+  const fabricationFolder = pane.addFolder({
+    title: 'Fabrication',
+    expanded: true,
+  });
+
+  // Cut Settings
+  const cutSettingsFolder = fabricationFolder.addFolder({
+    title: 'Cut Settings',
+    expanded: true,
+  });
+
+  cutSettingsFolder.addBinding(uiState, 'grout', {
+    label: 'Grout (in)',
+    min: 0,
+    max: 1,
+    step: 0.001,
+  }).on('change', () => {
     needsRedraw = true;
   });
 
-  addLabel('Kerf (inches)', 10, 630);
-  kerfInput = addNumberInput(10, 650, 0.05, 0, 1, 0.01, () => {
+  cutSettingsFolder.addBinding(uiState, 'kerf', {
+    label: 'Kerf (in)',
+    min: 0,
+    max: 1,
+    step: 0.001,
+  }).on('change', () => {
     needsRedraw = true;
   });
 
-  addLabel('Stock Width (inches)', 10, 690);
-  stockWidthInput = addNumberInput(10, 710, stockWidth, 1, 100, 1, (val) => {
-    stockWidth = val;
+  // Stock Settings
+  const stockFolder = fabricationFolder.addFolder({
+    title: 'Stock',
+    expanded: true,
   });
 
-  addLabel('Stock Height (inches)', 10, 750);
-  stockHeightInput = addNumberInput(10, 770, stockHeight, 1, 100, 1, (val) => {
-    stockHeight = val;
+  stockFolder.addBinding(uiState, 'stockWidth', {
+    label: 'Width (in)',
+    min: 1,
+    max: 100,
+    step: 0.1,
+  }).on('change', (ev) => {
+    stockWidth = ev.value;
   });
 
-  addLabel('Stock Margin (inches)', 10, 810);
-  stockMarginInput = addNumberInput(10, 830, stockMargin, 0, 10, 0.25, (val) => {
-    stockMargin = val;
+  stockFolder.addBinding(uiState, 'stockHeight', {
+    label: 'Height (in)',
+    min: 1,
+    max: 100,
+    step: 0.1,
+  }).on('change', (ev) => {
+    stockHeight = ev.value;
   });
 
-  addLabel('Chain Cutting', 10, 870);
-  chainCuttingCheckbox = addCheckbox(10, 890, chainCutting, (checked) => {
-    chainCutting = checked;
+  stockFolder.addBinding(uiState, 'stockMargin', {
+    label: 'Margin (in)',
+    min: 0,
+    max: 10,
+    step: 0.25,
+  }).on('change', (ev) => {
+    stockMargin = ev.value;
   });
 
-  previewNestButton = addButton('Preview Nest', 10, 920, () => {
+  fabricationFolder.addBinding(uiState, 'chainCutting', {
+    label: 'Chain Cutting',
+  }).on('change', (ev) => {
+    chainCutting = ev.value;
+  });
+
+  // Preview Nest Button
+  fabricationFolder.addButton({
+    title: 'Preview Nest',
+  }).on('click', () => {
     console.log('Preview nest functionality not yet implemented');
   });
 
-  fabYieldLabel = addLabel('Yield: 0%', 10, 960);
+  // Yield (monitor only)
+  fabricationFolder.addBinding(uiState, 'yield', {
+    label: 'Yield',
+    readonly: true,
+  });
 
-  toggleUIVisibility();
+  // Initial visibility setup
+  updateUIVisibility();
 }
 
 /**
- * Toggle UI visibility
+ * Update UI visibility based on mode
  */
-function toggleUIVisibility(): void {
-  const allElements = document.querySelectorAll('div, select, button, input');
-  allElements.forEach((el) => {
-    const htmlEl = el as HTMLElement;
-    if (htmlEl !== app.canvas && htmlEl.style.position === 'absolute') {
-      htmlEl.style.display = uibox ? 'block' : 'none';
+function updateUIVisibility(): void {
+  if (!pane) return;
+
+  // Show/hide the entire pane
+  const paneElement = pane.element;
+  paneElement.style.display = uibox ? 'block' : 'none';
+
+  // Show/hide folders based on mode
+  const allFolders = pane.children;
+  allFolders.forEach((child: any) => {
+    if (child.title === 'Explorer') {
+      child.hidden = fabricationMode;
+    } else if (child.title === 'Fabrication') {
+      child.hidden = !fabricationMode;
     }
   });
-
-  // Show/hide fabrication-specific controls
-  if (fabricationMode && uibox) {
-    groutInput.style.display = 'block';
-    kerfInput.style.display = 'block';
-    stockWidthInput.style.display = 'block';
-    stockHeightInput.style.display = 'block';
-    stockMarginInput.style.display = 'block';
-    chainCuttingCheckbox.style.display = 'block';
-    previewNestButton.style.display = 'block';
-    fabYieldLabel.style.display = 'block';
-  } else {
-    groutInput.style.display = 'none';
-    kerfInput.style.display = 'none';
-    stockWidthInput.style.display = 'none';
-    stockHeightInput.style.display = 'none';
-    stockMarginInput.style.display = 'none';
-    chainCuttingCheckbox.style.display = 'none';
-    previewNestButton.style.display = 'none';
-    fabYieldLabel.style.display = 'none';
-  }
 }
 
 /**
  * Export the current view as SVG
  */
 function exportSVG(): void {
-  const tileValue = tile_sel.value.replace(/[()]/g, '').split(',');
+  const tileValue = uiState.tile.replace(/[()]/g, '').split(',');
   const tiles = parseInt(tileValue[0]);
 
   let curr_sys = sys;
@@ -413,7 +363,7 @@ function draw(): void {
   const counters = { total: 0, visible: 0 };
 
   // Get tile iteration level
-  const tileValue = tile_sel.value.replace(/[()]/g, '').split(',');
+  const tileValue = uiState.tile.replace(/[()]/g, '').split(',');
   const tiles = parseInt(tileValue[0]);
 
   // Build supertiles
@@ -456,10 +406,11 @@ function draw(): void {
   // Draw the pattern directly into main container
   drawTilesToPixi(mainContainer, curr_sys['Gamma'], counters);
 
-  // Update tile count
+  // Update tile count in UI state
   tileCount = counters.total;
   visibleTileCount = counters.visible;
-  tile_count_label.textContent = `${visibleTileCount} visible / ${tileCount} total`;
+  uiState.tileCount = `${visibleTileCount} visible / ${tileCount} total`;
+  pane.refresh();
 }
 
 /**
