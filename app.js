@@ -788,7 +788,6 @@ function toggleUIVisibility() {
                       text.includes('Chain Cut') || text.includes('Yield')) {
                 label.style.display = '';
             }
-            }
         });
         
         tile_count_label.style.display = 'none';
