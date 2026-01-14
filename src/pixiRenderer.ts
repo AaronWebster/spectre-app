@@ -1,7 +1,7 @@
 // pixiRenderer.ts - Pixi.js-based renderer for improved performance
 
 import * as PIXI from 'pixi.js';
-import { Point, Color, ColorMap, TransformMatrix } from './types';
+import { Point, Color, TransformMatrix } from './types';
 
 /**
  * Pixi.js Graphics Pool for reusing graphics objects

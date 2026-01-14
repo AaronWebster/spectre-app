@@ -2,10 +2,10 @@
 
 import * as PIXI from 'pixi.js';
 import { TransformMatrix, ColorMap } from './types';
-import { buildSpectreBase, buildHatTurtleBase, buildHexBase, buildSupertiles } from './generator';
-import { Shape, CurvyShape, Meta } from './shapes';
+import { buildSpectreBase, buildHatTurtleBase, buildHexBase, buildSupertiles } from './generatorPixi';
+import { PixiShape, PixiCurvyShape, PixiMeta } from './pixiShapes';
 import { DEFAULT_SCALE, colmap53, colmap_orig, colmap_mystics } from './constants';
-import { ident, mul, ttrans } from './math';
+import { ident } from './math';
 
 // Application State
 let app: PIXI.Application;
@@ -16,7 +16,7 @@ let needsRedraw = true;
 
 let to_screen: TransformMatrix = [DEFAULT_SCALE, 0, 0, 0, -DEFAULT_SCALE, 0];
 let lw_scale = 1;
-let sys: Record<string, Shape | CurvyShape | Meta>;
+let sys: Record<string, PixiShape | PixiCurvyShape | PixiMeta>;
 let dragging = false;
 let uibox = true;
 let initialPinchDist = -1;
@@ -392,66 +392,14 @@ function exportSVG(): void {
 }
 
 /**
- * Draw a shape using Pixi.js graphics
- */
-function drawShapeToPixi(
-  graphics: PIXI.Graphics,
-  shape: Shape | CurvyShape
-): void {
-  // Draw the shape
-  const fillColor = colmap[shape.label];
-  const fillHex = (fillColor[0] << 16) | (fillColor[1] << 8) | fillColor[2];
-  
-  const pts = shape.pts;
-  
-  graphics.fill(fillHex);
-  graphics.stroke({ width: 0.1, color: 0x000000 });
-
-  if (shape instanceof CurvyShape) {
-    // Draw curvy shape with bezier curves
-    graphics.moveTo(pts[0].x, pts[0].y);
-    for (let idx = 1; idx < pts.length; idx += 3) {
-      const a = pts[idx];
-      const b = pts[idx + 1];
-      const c = pts[idx + 2];
-      graphics.bezierCurveTo(a.x, a.y, b.x, b.y, c.x, c.y);
-    }
-  } else {
-    // Draw regular polygon
-    graphics.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) {
-      graphics.lineTo(pts[i].x, pts[i].y);
-    }
-  }
-  graphics.closePath();
-
-  tileCount++;
-  visibleTileCount++;
-}
-
-/**
  * Recursively draw tiles using Pixi.js
  */
 function drawTilesToPixi(
   container: PIXI.Container,
-  tile: Shape | CurvyShape | Meta
+  tile: PixiShape | PixiCurvyShape | PixiMeta,
+  counters: { total: number; visible: number }
 ): void {
-  if (tile instanceof Meta) {
-    // Handle meta tiles
-    for (const g of tile.geoms) {
-      const childContainer = new PIXI.Container();
-      const M = g.xform;
-      const matrix = new PIXI.Matrix(M[0], M[3], M[1], M[4], M[2], M[5]);
-      childContainer.setFromMatrix(matrix);
-      container.addChild(childContainer);
-      drawTilesToPixi(childContainer, g.geom);
-    }
-  } else {
-    // Handle regular shapes
-    const graphics = new PIXI.Graphics();
-    drawShapeToPixi(graphics, tile);
-    container.addChild(graphics);
-  }
+  tile.draw(container, colmap, boundingBoxWidth, boundingBoxHeight, width, height, counters);
 }
 
 /**
@@ -460,8 +408,9 @@ function drawTilesToPixi(
 function draw(): void {
   // Clear previous frame
   mainContainer.removeChildren();
-  tileCount = 0;
-  visibleTileCount = 0;
+  
+  // Reset counters
+  const counters = { total: 0, visible: 0 };
 
   // Get tile iteration level
   const tileValue = tile_sel.value.replace(/[()]/g, '').split(',');
@@ -505,9 +454,11 @@ function draw(): void {
   mainContainer.setFromMatrix(matrix);
 
   // Draw the pattern directly into main container
-  drawTilesToPixi(mainContainer, curr_sys['Gamma']);
+  drawTilesToPixi(mainContainer, curr_sys['Gamma'], counters);
 
   // Update tile count
+  tileCount = counters.total;
+  visibleTileCount = counters.visible;
   tile_count_label.textContent = `${visibleTileCount} visible / ${tileCount} total`;
 }
 
