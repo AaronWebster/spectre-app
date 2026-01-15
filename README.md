@@ -47,6 +47,8 @@ Or directly with node:
 node run_spectre.cjs
 ```
 
+For more usage examples including different tile types and dimensions, see [EXAMPLES.md](EXAMPLES.md).
+
 ### Specifying Dimensions
 
 Generate a tiling with custom dimensions:
