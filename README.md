@@ -1,205 +1,179 @@
-# Spectre Tile Explorer
+# Spectre Tiling Generator
 
-Interactive TypeScript application for exploring the Spectre tile from "A Chiral Aperiodic Monotile" by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss.
+A standalone Node.js implementation for generating aperiodic Spectre tilings based on the paper "A Chiral Aperiodic Monotile" by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss.
+
+## Overview
+
+This project provides a command-line tool to generate SVG images of Spectre tilings and related aperiodic monotiles. The implementation uses a hierarchical substitution system to recursively construct tilings that fill any desired area without gaps or overlaps.
 
 ## Features
 
-- Interactive visualization of the Spectre tile and related aperiodic tilings
-- Multiple tile types: Spectre, Hat/Turtle, and Hexagons
-- Dense tiling: viewport is always fully populated with tiles (no whitespace)
-- Viewport culling: tiles outside the visible area are not rendered for optimal performance
-- Zoom and pan controls (mouse wheel and drag, or pinch-to-zoom on touch devices)
-- Export to SVG format
-- Tile numbering option
-- **Fabrication Mode**: Professional-grade manufacturing tools (see [FABRICATION.md](FABRICATION.md))
-  - Robust polygon offsetting for grout/kerf compensation
-  - Tile nesting for material efficiency
-  - Standards-compliant DXF export for CAD/CAM software
-  - Support for inches and millimeters
+- **Multiple Tile Types**: Generate tilings using Spectre, Hat/Turtle, or Hexagon tiles
+- **Configurable Output**: Specify custom dimensions for generated tilings
+- **SVG Export**: High-quality vector graphics output suitable for printing or further editing
+- **Automatic Centering**: Crops to a centered region with proper boundary handling
+- **Hierarchical Generation**: Uses supertile substitution to efficiently generate large tilings
 
-## Modern Architecture
-
-This application has been modernized with:
-
-- **TypeScript**: Full type safety for mathematical operations and shapes
-- **Vite**: Fast development server with HMR and optimized production builds
-- **Pixi.js**: Hardware-accelerated WebGL rendering for improved performance
-- **Modular ES6+**: Clean separation of concerns across multiple modules
-
-### Rendering Engine
-
-The application uses **Pixi.js v8** for high-performance 2D rendering:
-- Hardware-accelerated WebGL rendering with automatic fallback to Canvas
-- Efficient viewport culling - only visible tiles are rendered
-- Retained mode graphics for smoother animations
-- High DPI display support with automatic scaling
-
-### Bundle Size
-
-Bundle sizes are larger with Pixi.js but provide significant performance benefits:
-- **With Pixi.js**: ~234 KB (73 KB gzipped) - Hardware-accelerated rendering
-- **Previous Canvas**: 15 KB (5.22 KB gzipped) - Software rendering only
-
-## Development
+## Installation
 
 ### Prerequisites
 
-- Node.js 16+ and npm
+- Node.js 14.0.0 or higher
 
-### Installation
+### Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/AaronWebster/spectre-app.git
+cd spectre-app
+
+# Install dependencies
 npm install
 ```
 
-### Development Server
-
-Start the Vite development server with hot module replacement:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build for Production
-
-Create an optimized production build:
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist/` directory.
-
-### Preview Production Build
-
-Preview the production build locally:
-
-```bash
-npm run preview
-```
-
-## Deployment
-
-The application can be deployed to any static hosting service. The build process creates a fully self-contained `dist/` directory with all necessary files.
-
-### Deployment Steps
-
-1. **Build for production:**
-   ```bash
-   npm run build
-   ```
-
-2. **Deploy the `dist/` directory** to your hosting service of choice:
-   - **GitHub Pages**: Push the `dist/` directory to a `gh-pages` branch
-   - **Netlify**: Drag and drop the `dist/` folder or connect to your repository
-   - **Vercel**: Connect to your repository or use the Vercel CLI
-   - **Cloudflare Pages**: Connect to your repository or upload the `dist/` folder
-   - **Any static host**: Upload the contents of `dist/` to your web server
-
-### GitHub Pages Deployment Example
-
-```bash
-# Build the app
-npm run build
-
-# Deploy to GitHub Pages (using gh-pages package)
-npm install -g gh-pages
-gh-pages -d dist
-```
-
-### Custom Domain
-
-If using a custom domain, configure your DNS settings according to your hosting provider's documentation. For GitHub Pages, add a `CNAME` file to the `public/` directory before building.
-
 ## Usage
 
-### Controls
+### Basic Usage
 
-- **Mouse Wheel**: Zoom in/out
-- **Click and Drag**: Pan the view
-- **Touch Devices**: Pinch to zoom, drag to pan
-- **UI Controls**: Use the left sidebar to change shapes and export settings
+Generate a default tiling (100x100 units):
+
+```bash
+npm start
+```
+
+Or directly with node:
+
+```bash
+node run_spectre.cjs
+```
+
+### Specifying Dimensions
+
+Generate a tiling with custom dimensions:
+
+```bash
+node run_spectre.cjs 200 150
+# Width: 200 units, Height: 150 units
+```
+
+### Selecting Tile Types
+
+Choose different tile types:
+
+```bash
+# Spectre tiles (default "Tile(1,1)" variant)
+node run_spectre.cjs tile11 200 150
+
+# Curved Spectre tiles
+node run_spectre.cjs spectres 200 150
+
+# Hexagon tiles
+node run_spectre.cjs hexagons 200 150
+
+# Hat tiles with Turtle insets
+node run_spectre.cjs turtles 200 150
+
+# Turtle tiles with Hat insets
+node run_spectre.cjs hats 200 150
+```
+
+### Output
+
+The program generates an `output.svg` file in the current directory containing the tiling.
 
 ## Project Structure
 
 ```
-spectre-app/
-├── src/
-│   ├── types.ts           # TypeScript type definitions
-│   ├── math.ts            # Matrix and vector operations
-│   ├── pixiRenderer.ts    # Pixi.js renderer
-│   ├── pixiShapes.ts      # Pixi.js-based Shape classes
-│   ├── generatorPixi.ts   # Pixi.js tiling and substitution logic
-│   ├── constants.ts       # Color maps and tile coordinates
-│   ├── fabrication.ts     # Manufacturing/fabrication utilities
-│   └── mainPixi.ts        # Application entry point
-├── index.html             # HTML entry point
-├── vite.config.ts         # Vite configuration
-├── tsconfig.json          # TypeScript configuration
-├── app.test.js            # Mathematical correctness tests (96 tests)
-├── pixi.test.js           # Pixi.js component tests (60 tests)
-├── fabrication.test.js    # Fabrication feature tests (7 tests)
-├── FABRICATION.md         # Fabrication features documentation
-└── package.json           # Dependencies and scripts
+spectre-tiling/
+├── spectre.cjs           # Core tiling logic and shape definitions
+├── run_spectre.cjs       # Command-line interface and SVG generation
+├── spectre.test.js       # Unit tests for core tiling logic
+├── run_spectre.test.js   # Unit tests for CLI and generation
+├── 2305.17743v2.pdf      # Reference publication
+├── package.json          # Project dependencies and scripts
+├── jest.config.js        # Jest testing configuration
+├── README.md             # This file
+└── LICENSE               # License file
 ```
-
-## Code Quality
-
-The codebase follows modern TypeScript best practices:
-
-- Strong typing with interfaces for Point, TransformMatrix, Color, etc.
-- Modular architecture with clear separation of concerns
-- ES6+ features (const/let, arrow functions, template literals)
-- Comprehensive JSDoc documentation
-- Descriptive variable and function names
-- Organized code structure with clear modules
 
 ## Testing
 
-The project includes a comprehensive unit test suite with **163 tests** across three test files.
+The project includes comprehensive unit tests covering:
+- Point and affine matrix operations
+- Tile geometry construction (Spectre, Hat, Turtle, Hexagon)
+- Supertile substitution system
+- Shape classes and rendering
+- SVG generation and cropping logic
 
 ### Running Tests
 
 ```bash
-npm install
+# Run all tests
 npm test
+
+# Run tests in watch mode (re-run on file changes)
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
 ```
 
-### Test Coverage
+## Algorithm
 
-**Mathematical correctness tests (app.test.js)** - 96 tests organized into 11 suites:
-- Point operations (5 tests)
-- Affine matrix operations (20 tests)
-- Spectre tile geometry (11 tests) - **Enhanced with polygon validity and chirality tests**
-- Hat and Turtle tile geometry (7 tests)
-- Hexagon tile geometry (5 tests)
-- Supertile substitution system (5 tests)
-- Mathematical constants (4 tests)
-- Determinant and matrix properties (5 tests)
-- Tile substitution rules (2 tests)
-- Edge cases and boundary conditions (5 tests)
-- Tile counting and bounding box (11 tests)
-- Matrix operations reference consistency (16 tests)
+The tiling generation follows these steps:
 
-**Pixi.js tests (pixi.test.js)** - 60 tests organized into 4 suites:
-- Pixi.js Shape Classes (19 tests)
-- Pixi.js Generator Functions (5 tests)
-- Pixi.js Performance Optimizations (2 tests)
-- Integration tests for Matrix, Graphics, Container (34 tests)
+1. **Initialize Base System**: Create the base tile shapes according to the selected type
+2. **Hierarchical Substitution**: Repeatedly apply supertile substitution rules until the tiling covers the target area with sufficient margin
+3. **Flatten Hierarchy**: Traverse the hierarchical structure to extract all primitive shapes
+4. **Center and Crop**: Calculate the centroid of all shapes and crop to the desired dimensions
+5. **SVG Generation**: Export the visible shapes as SVG polygons
 
-**Fabrication tests (fabrication.test.js)** - 7 tests organized into 3 suites:
-- Polygon offsetting with js-angusj-clipper (3 tests)
-- DXF export with dxf-writer (3 tests)
-- Integration tests for offset and export (1 test)
+### Stopping Criterion
 
-See [TEST_DOCUMENTATION.md](TEST_DOCUMENTATION.md) for detailed information about the test suite.
+The algorithm stops when:
+- Physical bounds exceed 1.5× the target dimensions
+- Total area exceeds the growth factor (≈7.87) times the target area
+
+This ensures the cropped region contains only fully-formed tiles without boundary artifacts.
+
+## Mathematics
+
+The Spectre tile is a 14-sided polygon that tiles the plane aperiodically (without repeating patterns). The tiling uses a substitution system where tiles are grouped into "supertiles" that follow specific adjacency rules.
+
+Key properties:
+- **Aperiodic**: No translational symmetry
+- **Chiral**: The tile has a "handedness" (left/right)
+- **Monotile**: A single tile shape tiles the entire plane
+- **Edge-to-edge**: Tiles meet only along complete edges
+
+## Code Quality
+
+This project follows JavaScript/Node.js best practices:
+
+- **CommonJS Modules**: Uses `.cjs` extension for explicit CommonJS modules
+- **Comprehensive Testing**: 163+ unit tests with Jest
+- **Clear Documentation**: JSDoc-style comments throughout
+- **Descriptive Naming**: Self-documenting variable and function names
+- **Separation of Concerns**: Core logic separated from CLI interface
+- **Error Handling**: Graceful handling of edge cases
+- **Version Control**: Proper .gitignore for Node.js projects
+
+## Reference
+
+This implementation is based on the paper:
+
+**"A Chiral Aperiodic Monotile"**  
+David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss  
+arXiv:2305.17743v2 [math.CO]
+
+The reference PDF is included in this repository: `2305.17743v2.pdf`
 
 ## License
 
-ISC
+ISC License - See LICENSE file for details
 
 ## Credits
 
-Based on the paper "A Chiral Aperiodic Monotile" by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss.
+Original research by David Smith, Joseph Samuel Myers, Craig S. Kaplan, and Chaim Goodman-Strauss.
+
+Implementation inspired by the reference code and visualizations from the paper.
