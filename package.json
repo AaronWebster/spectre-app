@@ -7,7 +7,9 @@
     "start": "node run_spectre.cjs",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "lint": "eslint *.cjs *.js",
+    "lint:fix": "eslint *.cjs *.js --fix"
   },
   "keywords": [
     "spectre",
@@ -24,6 +26,7 @@
     "node": ">=14.0.0"
   },
   "devDependencies": {
+    "eslint": "^8.57.0",
     "jest": "^30.2.0"
   }
 }
