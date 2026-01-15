@@ -18,7 +18,7 @@ This project provides a command-line tool to generate SVG images of Spectre tili
 
 ### Prerequisites
 
-- Node.js 14.0.0 or higher
+- Node.js 16.0.0 or higher
 
 ### Setup
 

@@ -11,6 +11,7 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 
 // Mock p5.js constants and functions
 global.PI = Math.PI;
@@ -69,7 +70,7 @@ global.dist = (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 // Load spectre.cjs and make its variables globally accessible
 // Note: eval() is necessary here because spectre.cjs is designed for browser
 // environment and not as a CommonJS module. The code is from the same repository.
-let spectreCode = fs.readFileSync(__dirname + '/spectre.cjs', 'utf8');
+let spectreCode = fs.readFileSync(path.join(__dirname, 'spectre.cjs'), 'utf8');
 // Replace const/let with var to ensure global visibility
 spectreCode = spectreCode
     .replace(/\bconst\s+/g, 'var ')
