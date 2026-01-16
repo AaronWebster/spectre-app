@@ -383,7 +383,11 @@ describe('Reference Publication Consistency - Tile Geometry', () => {
 describe('Reference Publication Consistency - Growth Factor', () => {
     test('Growth factor equals 4 + √15 as specified in paper', () => {
         const GROWTH_FACTOR = 4 + Math.sqrt(15);
-        const expected = 7.872983346207417;
+        // Expected value is 4 + √15 ≈ 7.872983346207417
+        // This growth factor comes from the supertile substitution system
+        // described in the reference paper and is used to determine when
+        // the tiling has grown sufficiently to cover the target area.
+        const expected = 4 + Math.sqrt(15);
         expect(approxEqual(GROWTH_FACTOR, expected, 1e-10)).toBe(true);
     });
 
