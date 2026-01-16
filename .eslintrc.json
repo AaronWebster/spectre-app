@@ -1,0 +1,32 @@
+{
+  "env": {
+    "node": true,
+    "es6": true,
+    "jest": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "script"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "no-eval": "warn",
+    "no-implied-eval": "error",
+    "no-undef": "warn",
+    "no-constant-condition": "warn"
+  },
+  "globals": {
+    "sys": "writable",
+    "ident": "readonly",
+    "colmap": "writable",
+    "PI": "readonly",
+    "CLOSE": "readonly",
+    "cos": "readonly",
+    "sin": "readonly",
+    "radians": "readonly",
+    "mag": "readonly"
+  }
+}
+

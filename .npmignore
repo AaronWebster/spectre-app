@@ -1,0 +1,28 @@
+# Test files
+*.test.js
+jest.config.js
+coverage/
+
+# Development files
+.eslintrc.json
+.gitignore
+.git/
+.github/
+
+# Documentation that's not needed in npm package
+2305.17743v2.pdf
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output files
+output.svg
+*.svg
+
+# OS files
+.DS_Store
+Thumbs.db

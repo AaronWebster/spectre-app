@@ -1,21 +1,15 @@
 # Dependencies
 node_modules/
 npm-debug.log*
-
-# Vite build artifacts
-dist/
-dist-ssr/
-*.local
+yarn.log
+package-lock.json
 
 # Test coverage
 coverage/
 
-# Output files
-*.png
+# Output files (generated SVGs)
+output.svg
 *.svg
-
-# But include the favicon
-!favicon.ico
 
 # OS files
 .DS_Store
@@ -32,6 +26,3 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
-
-# Favicon generation script (temporary)
-generate_favicon.js
