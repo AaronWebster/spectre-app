@@ -40,6 +40,11 @@ function saveStrings() {}
 const windowWidth = 100;
 const windowHeight = 100;
 
+// Load Clipper library for proper polygon offsetting
+// Clipper is specifically designed for polygon offset/buffer operations
+// and provides precise control over join styles (round, miter, square)
+const ClipperLib = require('js-clipper');
+
 // -- Include spectre.js content --
 let spectreCode = fs.readFileSync("spectre.cjs", "utf8");
 // Replace const/let with var to ensure visibility from eval in Node
