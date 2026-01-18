@@ -24,7 +24,7 @@ describe('Complete Output File Generation', () => {
 
     test('run_spectre.cjs generates valid SVG file', () => {
         // Run the script
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         
         // Verify file exists
         expect(fs.existsSync('output.svg')).toBe(true);
@@ -40,7 +40,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated SVG contains polygon elements', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Should have polygon elements
@@ -56,7 +56,7 @@ describe('Complete Output File Generation', () => {
         const width = 100;
         const height = 150;
         
-        execSync(`node run_spectre.cjs ${width} ${height}`, { cwd: __dirname });
+        execSync(`node run_spectre.cjs --width ${width} --height ${height}`, { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Extract viewBox
@@ -72,7 +72,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated polygons have valid coordinates', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Extract first polygon points
@@ -98,7 +98,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated polygons have required SVG attributes', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Extract first polygon
@@ -114,7 +114,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated polygons use white fill as configured', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // run_spectre.cjs sets all colors to white [255, 255, 255]
@@ -123,12 +123,12 @@ describe('Complete Output File Generation', () => {
 
     test('Different tile types generate different outputs', () => {
         // Generate with default tile11
-        execSync('node run_spectre.cjs tile11 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --shape tile11 --width 50 --height 50', { cwd: __dirname });
         const content1 = fs.readFileSync('output.svg', 'utf8');
         const polygonCount1 = (content1.match(/<polygon/g) || []).length;
         
         // Generate with hexagons
-        execSync('node run_spectre.cjs hexagons 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --shape hexagons --width 50 --height 50', { cwd: __dirname });
         const content2 = fs.readFileSync('output.svg', 'utf8');
         const polygonCount2 = (content2.match(/<polygon/g) || []).length;
         
@@ -139,12 +139,12 @@ describe('Complete Output File Generation', () => {
 
     test('Larger dimensions generate more shapes', () => {
         // Small size
-        execSync('node run_spectre.cjs 30 30', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 30 --height 30', { cwd: __dirname });
         const content1 = fs.readFileSync('output.svg', 'utf8');
         const polygonCount1 = (content1.match(/<polygon/g) || []).length;
         
         // Larger size
-        execSync('node run_spectre.cjs 100 100', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 100 --height 100', { cwd: __dirname });
         const content2 = fs.readFileSync('output.svg', 'utf8');
         const polygonCount2 = (content2.match(/<polygon/g) || []).length;
         
@@ -153,7 +153,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated file is valid UTF-8', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         
         // Should be able to read without encoding errors
         expect(() => {
@@ -162,7 +162,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated file has reasonable size', () => {
-        execSync('node run_spectre.cjs 100 100', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 100 --height 100', { cwd: __dirname });
         const stats = fs.statSync('output.svg');
         
         // Should be at least 1KB
@@ -173,7 +173,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Curved spectres generate path elements instead of polygons', () => {
-        execSync('node run_spectre.cjs spectres 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --shape spectres --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Should have path elements with curves
@@ -183,7 +183,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Generated SVG viewBox center aligns with centroid logic', () => {
-        execSync('node run_spectre.cjs 100 100', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 100 --height 100', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         const viewBoxMatch = content.match(/viewBox="([^"]+)"/);
@@ -202,7 +202,7 @@ describe('Complete Output File Generation', () => {
     });
 
     test('Console output provides generation statistics', () => {
-        const output = execSync('node run_spectre.cjs 50 50', { 
+        const output = execSync('node run_spectre.cjs --width 50 --height 50', { 
             cwd: __dirname,
             encoding: 'utf8' 
         });
@@ -240,7 +240,7 @@ describe('Output File Mathematical Correctness', () => {
     });
 
     test('Generated polygon vertices form closed shapes', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Extract all polygon points
@@ -261,7 +261,7 @@ describe('Output File Mathematical Correctness', () => {
     });
 
     test('All polygon coordinates are within viewBox bounds', () => {
-        execSync('node run_spectre.cjs 80 80', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 80 --height 80', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         // Extract viewBox
@@ -294,7 +294,7 @@ describe('Output File Mathematical Correctness', () => {
     });
 
     test('Generated shapes have positive area', () => {
-        execSync('node run_spectre.cjs 50 50', { cwd: __dirname });
+        execSync('node run_spectre.cjs --width 50 --height 50', { cwd: __dirname });
         const content = fs.readFileSync('output.svg', 'utf8');
         
         function polyArea(pts) {
