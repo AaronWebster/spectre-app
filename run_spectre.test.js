@@ -65,6 +65,18 @@ function createMockEnvironment() {
     global.windowHeight = 100;
 }
 
+// Shared helper function to load and prepare spectre code for testing
+function loadSpectreCode() {
+    const fs = require('fs');
+    let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
+    spectreCode = spectreCode
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ')
+        .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
+    // Use indirect eval to make variables global
+    (1, eval)(spectreCode);
+}
+
 describe('Run Spectre - Environment Setup', () => {
     beforeEach(() => {
         createMockEnvironment();
@@ -875,5 +887,153 @@ describe('Run Spectre - Edge Cases', () => {
         expect(maxX).toBe(-4);
         expect(minY).toBe(-5);
         expect(maxY).toBe(-4);
+    });
+});
+
+describe('Run Spectre - Grout Spacing Feature', () => {
+    beforeEach(() => {
+        createMockEnvironment();
+    });
+
+    test('Grout spacing argument is parsed correctly', () => {
+        // Simulate command line: node run_spectre.cjs --grout-spacing-inches 0.1 100 100
+        const args = ['--grout-spacing-inches', '0.1', '100', '100'];
+        
+        let groutSpacingInches = 0;
+        const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
+        if (groutSpacingIndex !== -1 && groutSpacingIndex + 1 < args.length) {
+            groutSpacingInches = parseFloat(args[groutSpacingIndex + 1]);
+        }
+        
+        expect(groutSpacingInches).toBe(0.1);
+    });
+
+    test('Grout spacing converts inches to units correctly', () => {
+        const groutSpacingInches = 0.1;
+        const DPI = 96;
+        const groutSpacingUnits = groutSpacingInches * DPI;
+        
+        expect(approxEqual(groutSpacingUnits, 9.6)).toBe(true);
+    });
+
+    test('Grout spacing flag is removed from args array', () => {
+        const args = ['--grout-spacing-inches', '0.1', '100', '100'];
+        const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
+        if (groutSpacingIndex !== -1) {
+            args.splice(groutSpacingIndex, 2);
+        }
+        
+        expect(args).toEqual(['100', '100']);
+    });
+
+    test('Multiple flags work together', () => {
+        const args = ['--tile-size-inches', '--grout-spacing-inches', '0.05', '8', '6'];
+        
+        let useTileSizeInches = false;
+        let groutSpacingInches = 0;
+        
+        const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
+        if (tileSizeInchesIndex !== -1) {
+            useTileSizeInches = true;
+            args.splice(tileSizeInchesIndex, 1);
+        }
+        
+        const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
+        if (groutSpacingIndex !== -1 && groutSpacingIndex + 1 < args.length) {
+            groutSpacingInches = parseFloat(args[groutSpacingIndex + 1]);
+            args.splice(groutSpacingIndex, 2);
+        }
+        
+        expect(useTileSizeInches).toBe(true);
+        expect(groutSpacingInches).toBe(0.05);
+        expect(args).toEqual(['8', '6']);
+    });
+
+    test('Zero grout spacing is handled correctly', () => {
+        const groutSpacingInches = 0;
+        const DPI = 96;
+        const groutSpacingUnits = groutSpacingInches * DPI;
+        
+        expect(groutSpacingUnits).toBe(0);
+    });
+});
+
+describe('Run Spectre - Erosion Function', () => {
+    beforeEach(() => {
+        createMockEnvironment();
+    });
+
+    test('erodePoints returns original points when erosion is zero', () => {
+        loadSpectreCode();
+
+        const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
+        const eroded = erodePoints(pts, 0);
+        
+        expect(eroded.length).toBe(pts.length);
+        for (let i = 0; i < pts.length; i++) {
+            expect(pointsEqual(eroded[i], pts[i])).toBe(true);
+        }
+    });
+
+    test('erodePoints shrinks square towards centroid', () => {
+        loadSpectreCode();
+
+        const pts = [pt(0, 0), pt(2, 0), pt(2, 2), pt(0, 2)];
+        const eroded = erodePoints(pts, 0.1);
+        
+        // Centroid is at (1, 1)
+        // Each point should be closer to centroid
+        expect(eroded.length).toBe(pts.length);
+        
+        for (let i = 0; i < pts.length; i++) {
+            const origDist = Math.sqrt(
+                (pts[i].x - 1) * (pts[i].x - 1) + 
+                (pts[i].y - 1) * (pts[i].y - 1)
+            );
+            const erodedDist = Math.sqrt(
+                (eroded[i].x - 1) * (eroded[i].x - 1) + 
+                (eroded[i].y - 1) * (eroded[i].y - 1)
+            );
+            
+            expect(erodedDist).toBeLessThan(origDist);
+        }
+    });
+
+    test('erodePoints with empty array returns empty array', () => {
+        loadSpectreCode();
+
+        const pts = [];
+        const eroded = erodePoints(pts, 1.0);
+        
+        expect(eroded).toEqual([]);
+    });
+
+    test('erodePoints calculates centroid correctly', () => {
+        loadSpectreCode();
+
+        const pts = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
+        // Centroid should be at (2, 2)
+        
+        // If we erode by the exact distance to centroid, all points should collapse to centroid
+        const dist = Math.sqrt(2 * 2 + 2 * 2); // Distance from corner to centroid
+        const eroded = erodePoints(pts, dist);
+        
+        // All points should be at or very close to centroid
+        for (let i = 0; i < eroded.length; i++) {
+            expect(approxEqual(eroded[i].x, 2, 0.01)).toBe(true);
+            expect(approxEqual(eroded[i].y, 2, 0.01)).toBe(true);
+        }
+    });
+
+    test('erodePoints with negative erosion acts like zero', () => {
+        loadSpectreCode();
+
+        const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
+        const eroded = erodePoints(pts, -0.5);
+        
+        expect(eroded.length).toBe(pts.length);
+        for (let i = 0; i < pts.length; i++) {
+            expect(pointsEqual(eroded[i], pts[i])).toBe(true);
+        }
     });
 });

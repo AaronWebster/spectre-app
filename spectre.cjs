@@ -118,6 +118,44 @@ function pframe( o, p, q, a, b )
 	return { x : o.x + a*p.x + b*q.x, y : o.y + a*p.y + b*q.y };
 }
 
+// Erode points towards their centroid by a given distance
+// This creates spacing (like grout) between tiles
+function erodePoints( pts, erosionDistance )
+{
+	if (erosionDistance <= 0 || pts.length === 0) {
+		return pts;
+	}
+	
+	// Calculate centroid
+	let cx = 0, cy = 0;
+	for (let p of pts) {
+		cx += p.x;
+		cy += p.y;
+	}
+	cx /= pts.length;
+	cy /= pts.length;
+	
+	// Move each point towards centroid
+	const erodedPts = [];
+	for (let p of pts) {
+		const dx = p.x - cx;
+		const dy = p.y - cy;
+		const dist = Math.sqrt(dx * dx + dy * dy);
+		
+		if (dist > erosionDistance) {
+			// Move point towards centroid by erosionDistance
+			const factor = (dist - erosionDistance) / dist;
+			erodedPts.push(pt(cx + dx * factor, cy + dy * factor));
+		} else {
+			// Point collapses to centroid when erosion >= distance to centroid, potentially creating degenerate shapes
+			erodedPts.push(pt(cx, cy));
+		}
+	}
+	
+	return erodedPts;
+}
+
+
 // Rotation matrix
 function trot( ang )
 {
@@ -201,12 +239,21 @@ class Shape
 		drawPolygon( this.pts, S, colmap[this.label], [0,0,0], 0.1 );
 	}
 
-	streamSVG( S, stream )
+	streamSVG( S, stream, groutSpacing )
 	{
+		groutSpacing = groutSpacing || 0; // Default to 0 if not provided
+		
+		// Transform points to world coordinates
+		let worldPts = this.pts.map((p) => transPt(S, p));
+		
+		// Apply erosion if grout spacing is specified
+		if (groutSpacing > 0) {
+			worldPts = erodePoints(worldPts, groutSpacing / 2);
+		}
+		
 		var s = '<polygon points="';
 		var at_start = true;
-		for( let p of this.pts ) {
-			const sp = transPt( S, p );
+		for( let sp of worldPts ) {
 			if( at_start ) {
 				at_start = false;
 			} else {
@@ -267,17 +314,58 @@ class CurvyShape
 		endShape( CLOSE );
 	}
 
-	streamSVG( S, stream )
+	streamSVG( S, stream, groutSpacing )
 	{
-		const tp = transPt( S, this.pts[0] );
+		groutSpacing = groutSpacing || 0; // Default to 0 if not provided
+		
+		// Transform all points to world coordinates first
+		let worldPts = this.pts.map((p) => transPt(S, p));
+		
+		// Apply erosion if grout spacing is specified
+		// For curved shapes, we erode the corner points (every 3rd point: 0, 3, 6, ...)
+		// and adjust control points proportionally
+		if (groutSpacing > 0) {
+			// Extract corner points (indices 0, 3, 6, 9, ...)
+			const cornerPointIndices = [];
+			const cornerPoints = [];
+			for (let i = 0; i < worldPts.length; i += 3) {
+				cornerPointIndices.push(i);
+				cornerPoints.push(worldPts[i]);
+			}
+			
+			// Erode the corner points
+			const erodedCorners = erodePoints(cornerPoints, groutSpacing / 2);
+			
+			// Update worldPts with eroded corners and adjust control points
+			for (let i = 0; i < cornerPointIndices.length; i++) {
+				const idx = cornerPointIndices[i];
+				const oldCorner = worldPts[idx];
+				const newCorner = erodedCorners[i];
+				const dx = newCorner.x - oldCorner.x;
+				const dy = newCorner.y - oldCorner.y;
+				
+				// Move corner
+				worldPts[idx] = newCorner;
+				
+				// Move the two control points following this corner (if they exist)
+				if (idx + 1 < worldPts.length) {
+					worldPts[idx + 1] = pt(worldPts[idx + 1].x + dx, worldPts[idx + 1].y + dy);
+				}
+				if (idx + 2 < worldPts.length) {
+					worldPts[idx + 2] = pt(worldPts[idx + 2].x + dx, worldPts[idx + 2].y + dy);
+				}
+			}
+		}
+		
+		const tp = worldPts[0];
 		vertex( tp.x, tp.y );
 
 		var s = `<path d="M ${tp.x} ${tp.y}`;
 		
-		for( let idx = 1; idx < this.pts.length; idx += 3 ) {
-			const a = transPt( S, this.pts[idx] );
-			const b = transPt( S, this.pts[idx+1] );
-			const c = transPt( S, this.pts[idx+2] );
+		for( let idx = 1; idx < worldPts.length; idx += 3 ) {
+			const a = worldPts[idx];
+			const b = worldPts[idx+1];
+			const c = worldPts[idx+2];
 
 			s = s + ` C ${a.x} ${a.y} ${b.x} ${b.y} ${c.x} ${c.y}`;	
 		}
@@ -308,10 +396,10 @@ class Meta
 		}
 	}
 
-	streamSVG( S, stream )
+	streamSVG( S, stream, groutSpacing )
 	{
 		for( let g of this.geoms ) {
-			g.geom.streamSVG( mul( S, g.xform ), stream );
+			g.geom.streamSVG( mul( S, g.xform ), stream, groutSpacing );
 		}
 	}
 }
