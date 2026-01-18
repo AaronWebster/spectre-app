@@ -65,6 +65,18 @@ function createMockEnvironment() {
     global.windowHeight = 100;
 }
 
+// Shared helper function to load and prepare spectre code for testing
+function loadSpectreCode() {
+    const fs = require('fs');
+    let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
+    spectreCode = spectreCode
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ')
+        .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
+    // Use indirect eval to make variables global
+    (1, eval)(spectreCode);
+}
+
 describe('Run Spectre - Environment Setup', () => {
     beforeEach(() => {
         createMockEnvironment();
@@ -952,14 +964,7 @@ describe('Run Spectre - Erosion Function', () => {
     });
 
     test('erodePoints returns original points when erosion is zero', () => {
-        // Load spectre.cjs to get erodePoints function
-        const fs = require('fs');
-        let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
-        spectreCode = spectreCode
-            .replace(/\bconst\s+/g, 'var ')
-            .replace(/\blet\s+/g, 'var ')
-            .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
-        eval(spectreCode);
+        loadSpectreCode();
 
         const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
         const eroded = erodePoints(pts, 0);
@@ -971,14 +976,7 @@ describe('Run Spectre - Erosion Function', () => {
     });
 
     test('erodePoints shrinks square towards centroid', () => {
-        // Load spectre.cjs to get erodePoints function
-        const fs = require('fs');
-        let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
-        spectreCode = spectreCode
-            .replace(/\bconst\s+/g, 'var ')
-            .replace(/\blet\s+/g, 'var ')
-            .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
-        eval(spectreCode);
+        loadSpectreCode();
 
         const pts = [pt(0, 0), pt(2, 0), pt(2, 2), pt(0, 2)];
         const eroded = erodePoints(pts, 0.1);
@@ -1002,14 +1000,7 @@ describe('Run Spectre - Erosion Function', () => {
     });
 
     test('erodePoints with empty array returns empty array', () => {
-        // Load spectre.cjs to get erodePoints function
-        const fs = require('fs');
-        let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
-        spectreCode = spectreCode
-            .replace(/\bconst\s+/g, 'var ')
-            .replace(/\blet\s+/g, 'var ')
-            .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
-        eval(spectreCode);
+        loadSpectreCode();
 
         const pts = [];
         const eroded = erodePoints(pts, 1.0);
@@ -1018,14 +1009,7 @@ describe('Run Spectre - Erosion Function', () => {
     });
 
     test('erodePoints calculates centroid correctly', () => {
-        // Load spectre.cjs to get erodePoints function
-        const fs = require('fs');
-        let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
-        spectreCode = spectreCode
-            .replace(/\bconst\s+/g, 'var ')
-            .replace(/\blet\s+/g, 'var ')
-            .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
-        eval(spectreCode);
+        loadSpectreCode();
 
         const pts = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
         // Centroid should be at (2, 2)
@@ -1042,14 +1026,7 @@ describe('Run Spectre - Erosion Function', () => {
     });
 
     test('erodePoints with negative erosion acts like zero', () => {
-        // Load spectre.cjs to get erodePoints function
-        const fs = require('fs');
-        let spectreCode = fs.readFileSync('spectre.cjs', 'utf8');
-        spectreCode = spectreCode
-            .replace(/\bconst\s+/g, 'var ')
-            .replace(/\blet\s+/g, 'var ')
-            .replace(/\bclass\s+(\w+)/g, 'var $1 = class $1');
-        eval(spectreCode);
+        loadSpectreCode();
 
         const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
         const eroded = erodePoints(pts, -0.5);

@@ -147,7 +147,8 @@ function erodePoints( pts, erosionDistance )
 			const factor = (dist - erosionDistance) / dist;
 			erodedPts.push(pt(cx + dx * factor, cy + dy * factor));
 		} else {
-			// If point is very close to centroid, keep it at centroid
+			// Warning: If erosion distance >= distance to centroid, the point collapses to centroid.
+			// This can create degenerate shapes if erosion distance is too large relative to tile size.
 			erodedPts.push(pt(cx, cy));
 		}
 	}
@@ -326,10 +327,10 @@ class CurvyShape
 		// and adjust control points proportionally
 		if (groutSpacing > 0) {
 			// Extract corner points (indices 0, 3, 6, 9, ...)
-			const cornerIndices = [];
+			const cornerPointIndices = [];
 			const cornerPoints = [];
 			for (let i = 0; i < worldPts.length; i += 3) {
-				cornerIndices.push(i);
+				cornerPointIndices.push(i);
 				cornerPoints.push(worldPts[i]);
 			}
 			
@@ -337,8 +338,8 @@ class CurvyShape
 			const erodedCorners = erodePoints(cornerPoints, groutSpacing / 2);
 			
 			// Update worldPts with eroded corners and adjust control points
-			for (let i = 0; i < cornerIndices.length; i++) {
-				const idx = cornerIndices[i];
+			for (let i = 0; i < cornerPointIndices.length; i++) {
+				const idx = cornerPointIndices[i];
 				const oldCorner = worldPts[idx];
 				const newCorner = erodedCorners[i];
 				const dx = newCorner.x - oldCorner.x;

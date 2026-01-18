@@ -74,7 +74,13 @@ function run() {
   const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
   if (groutSpacingIndex !== -1) {
     if (groutSpacingIndex + 1 < args.length) {
-      groutSpacingInches = parseFloat(args[groutSpacingIndex + 1]);
+      const parsedValue = parseFloat(args[groutSpacingIndex + 1]);
+      if (!isNaN(parsedValue) && parsedValue >= 0) {
+        groutSpacingInches = parsedValue;
+      } else {
+        console.error(`Error: Invalid grout spacing value "${args[groutSpacingIndex + 1]}". Must be a non-negative number.`);
+        process.exit(1);
+      }
       args.splice(groutSpacingIndex, 2); // Remove flag and value
     }
   }
