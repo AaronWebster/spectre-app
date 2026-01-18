@@ -58,6 +58,22 @@ node run_spectre.cjs 200 150
 # Width: 200 units, Height: 150 units
 ```
 
+### Specifying Dimensions in Inches
+
+Generate a tiling with dimensions specified in inches (converted using 96 DPI):
+
+```bash
+node run_spectre.cjs --tile-size-inches 8 6
+# Width: 8 inches (768 units), Height: 6 inches (576 units)
+```
+
+The `--tile-size-inches` flag can be combined with tile type selection:
+
+```bash
+node run_spectre.cjs --tile-size-inches hexagons 5 5
+# 5x5 inch hexagonal tiling
+```
+
 ### Selecting Tile Types
 
 Choose different tile types:

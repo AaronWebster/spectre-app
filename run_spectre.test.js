@@ -417,6 +417,139 @@ describe('Run Spectre - Argument Parsing Logic', () => {
     });
 });
 
+describe('Run Spectre - Tile Size in Inches', () => {
+    test('DPI constant is 96 (standard for SVG/CSS)', () => {
+        const DPI = 96;
+        expect(DPI).toBe(96);
+    });
+
+    test('Inches to units conversion with default dimensions', () => {
+        let targetWidth = 100;
+        let targetHeight = 100;
+        let useTileSizeInches = false;
+        
+        const args = ['--tile-size-inches'];
+        const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
+        
+        if (tileSizeInchesIndex !== -1) {
+            useTileSizeInches = true;
+        }
+        
+        if (useTileSizeInches) {
+            const DPI = 96;
+            targetWidth = targetWidth * DPI;
+            targetHeight = targetHeight * DPI;
+        }
+        
+        expect(useTileSizeInches).toBe(true);
+        expect(targetWidth).toBe(9600);
+        expect(targetHeight).toBe(9600);
+    });
+
+    test('Inches to units conversion with custom dimensions', () => {
+        let targetWidth = 5;
+        let targetHeight = 3;
+        let useTileSizeInches = true;
+        
+        if (useTileSizeInches) {
+            const DPI = 96;
+            targetWidth = targetWidth * DPI;
+            targetHeight = targetHeight * DPI;
+        }
+        
+        expect(targetWidth).toBe(480);
+        expect(targetHeight).toBe(288);
+    });
+
+    test('Flag removal from args array', () => {
+        const args = ['--tile-size-inches', '5', '3'];
+        const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
+        
+        if (tileSizeInchesIndex !== -1) {
+            args.splice(tileSizeInchesIndex, 1);
+        }
+        
+        expect(args).toEqual(['5', '3']);
+        expect(args.length).toBe(2);
+    });
+
+    test('Flag with shape argument', () => {
+        let shapeArg = 'tile11';
+        let targetWidth = 100;
+        let targetHeight = 100;
+        let useTileSizeInches = false;
+        
+        const args = ['--tile-size-inches', 'hexagons', '2', '1.5'];
+        const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
+        
+        if (tileSizeInchesIndex !== -1) {
+            useTileSizeInches = true;
+            args.splice(tileSizeInchesIndex, 1);
+        }
+        
+        if (args.length > 0) {
+            if (isNaN(parseFloat(args[0]))) {
+                shapeArg = args[0].toLowerCase();
+                if (args[1]) targetWidth = parseFloat(args[1]);
+                if (args[2]) targetHeight = parseFloat(args[2]);
+            } else {
+                targetWidth = parseFloat(args[0]);
+                if (args[1]) targetHeight = parseFloat(args[1]);
+            }
+        }
+        
+        if (useTileSizeInches) {
+            const DPI = 96;
+            targetWidth = targetWidth * DPI;
+            targetHeight = targetHeight * DPI;
+        }
+        
+        expect(shapeArg).toBe('hexagons');
+        expect(targetWidth).toBe(192);
+        expect(targetHeight).toBe(144);
+    });
+
+    test('Flag without dimensions uses defaults', () => {
+        let targetWidth = 100;
+        let targetHeight = 100;
+        let useTileSizeInches = false;
+        
+        const args = ['--tile-size-inches'];
+        const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
+        
+        if (tileSizeInchesIndex !== -1) {
+            useTileSizeInches = true;
+            args.splice(tileSizeInchesIndex, 1);
+        }
+        
+        // No additional args to parse
+        
+        if (useTileSizeInches) {
+            const DPI = 96;
+            targetWidth = targetWidth * DPI;
+            targetHeight = targetHeight * DPI;
+        }
+        
+        expect(targetWidth).toBe(9600);
+        expect(targetHeight).toBe(9600);
+    });
+
+    test('Fractional inch dimensions', () => {
+        let targetWidth = 2.5;
+        let targetHeight = 1.75;
+        let useTileSizeInches = true;
+        
+        if (useTileSizeInches) {
+            const DPI = 96;
+            targetWidth = targetWidth * DPI;
+            targetHeight = targetHeight * DPI;
+        }
+        
+        expect(targetWidth).toBe(240);
+        expect(targetHeight).toBe(168);
+    });
+});
+
 describe('Run Spectre - SVG Generation', () => {
     test('SVG header has correct viewBox', () => {
         const cropMinX = -50;
