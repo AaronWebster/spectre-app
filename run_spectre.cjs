@@ -58,6 +58,7 @@ function run() {
   let targetWidth = 100;
   let targetHeight = 100;
   let useTileSizeInches = false;
+  let groutSpacingInches = 0;
 
   // Argument Parsing
   const args = process.argv.slice(2);
@@ -67,6 +68,15 @@ function run() {
   if (tileSizeInchesIndex !== -1) {
     useTileSizeInches = true;
     args.splice(tileSizeInchesIndex, 1); // Remove the flag
+  }
+  
+  // Check for --grout-spacing-inches flag
+  const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
+  if (groutSpacingIndex !== -1) {
+    if (groutSpacingIndex + 1 < args.length) {
+      groutSpacingInches = parseFloat(args[groutSpacingIndex + 1]);
+      args.splice(groutSpacingIndex, 2); // Remove flag and value
+    }
   }
   
   if (args.length > 0) {
@@ -81,14 +91,17 @@ function run() {
   }
 
   // Convert inches to units (96 DPI standard for SVG)
+  const DPI = 96;
   if (useTileSizeInches) {
-    const DPI = 96;
     targetWidth = targetWidth * DPI;
     targetHeight = targetHeight * DPI;
   }
+  
+  // Convert grout spacing from inches to units
+  const groutSpacingUnits = groutSpacingInches * DPI;
 
   console.log(
-    `Configuration: Shape=${shapeArg}, Size=${targetWidth}x${targetHeight}${useTileSizeInches ? ' (from inches)' : ''}`,
+    `Configuration: Shape=${shapeArg}, Size=${targetWidth}x${targetHeight}${useTileSizeInches ? ' (from inches)' : ''}${groutSpacingInches > 0 ? `, Grout=${groutSpacingInches} inches` : ''}`,
   );
 
   console.log("Initializing Spectre Base...");
@@ -291,7 +304,7 @@ function run() {
   svgContent.push(svgHeader);
 
   for (let item of keptShapes) {
-    item.shape.streamSVG(item.T, svgContent);
+    item.shape.streamSVG(item.T, svgContent, groutSpacingUnits);
   }
 
   svgContent.push(svgFooter);
