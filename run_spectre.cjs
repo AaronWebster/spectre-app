@@ -76,6 +76,87 @@ function parseNumericFlag(args, flagName, validationFn, errorMessage) {
   return null;
 }
 
+// Helper function to parse string flag arguments
+function parseStringFlag(args, flagName) {
+  const flagIndex = args.indexOf(flagName);
+  if (flagIndex !== -1) {
+    if (flagIndex + 1 < args.length) {
+      const value = args[flagIndex + 1];
+      args.splice(flagIndex, 2); // Remove flag and value
+      return value;
+    }
+  }
+  return null;
+}
+
+// Helper function to check for boolean flags
+function hasBooleanFlag(args, flagName) {
+  const flagIndex = args.indexOf(flagName);
+  if (flagIndex !== -1) {
+    args.splice(flagIndex, 1); // Remove flag
+    return true;
+  }
+  return false;
+}
+
+// Helper function to show usage help
+function showHelp() {
+  console.log(`
+Spectre Tiling Generator - Usage Guide
+
+SYNOPSIS:
+  node run_spectre.cjs [OPTIONS]
+
+OPTIONS:
+  --help                        Show this help message and exit
+
+  --shape <type>                Tile type to generate (default: tile11)
+                                Options: tile11, spectres, hexagons, turtles, hats
+  
+  --width <value>               Width in units (default: 100)
+  --height <value>              Height in units (default: 100)
+  
+  --tile-size-inches            Interpret width/height as inches (96 DPI)
+  
+  --scale <value>               Scale tiles from centroid (default: 1.0)
+                                Values < 1.0 create gaps, > 1.0 create overlaps
+  
+  --grout-spacing-inches <val>  Add spacing between tiles in inches
+  
+  --kerf <value>                Kerf width for waterjet cutting (inches)
+  --spacing <value>             Spacing between tiles for CAM (inches)
+
+EXAMPLES:
+  # Default 100x100 tiling
+  node run_spectre.cjs
+  
+  # Custom dimensions
+  node run_spectre.cjs --width 200 --height 150
+  
+  # Different tile type
+  node run_spectre.cjs --shape hexagons --width 200 --height 200
+  
+  # Dimensions in inches
+  node run_spectre.cjs --tile-size-inches --width 8 --height 6
+  
+  # With grout spacing
+  node run_spectre.cjs --grout-spacing-inches 0.01 --width 200 --height 150
+  
+  # Waterjet toolpath
+  node run_spectre.cjs --kerf 0.01 --spacing 0.03 --width 200 --height 150
+  
+  # Scaled tiles
+  node run_spectre.cjs --scale 0.95 --width 200 --height 150
+
+OUTPUT:
+  Generates output.svg in the current directory
+
+For more examples, see EXAMPLES.md
+For detailed documentation, see README.md
+`);
+  process.exit(0);
+}
+
 function run() {
   let shapeArg = "tile11";
   let targetWidth = 100;
@@ -89,14 +170,25 @@ function run() {
   // Argument Parsing
   const args = process.argv.slice(2);
   
-  // Check for --tile-size-inches flag
-  const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
-  if (tileSizeInchesIndex !== -1) {
-    useTileSizeInches = true;
-    args.splice(tileSizeInchesIndex, 1); // Remove the flag
+  // Check for --help flag first
+  if (hasBooleanFlag(args, '--help') || hasBooleanFlag(args, '-h')) {
+    showHelp();
   }
   
+  // Check for --tile-size-inches flag
+  useTileSizeInches = hasBooleanFlag(args, '--tile-size-inches');
+  
+  // Parse string flags
+  const shapeValue = parseStringFlag(args, '--shape');
+  if (shapeValue !== null) shapeArg = shapeValue.toLowerCase();
+  
   // Parse numeric flags
+  const widthValue = parseNumericFlag(args, '--width', (v) => v > 0, 'width');
+  if (widthValue !== null) targetWidth = widthValue;
+  
+  const heightValue = parseNumericFlag(args, '--height', (v) => v > 0, 'height');
+  if (heightValue !== null) targetHeight = heightValue;
+  
   const kerfValue = parseNumericFlag(args, '--kerf', (v) => v >= 0, 'kerf');
   if (kerfValue !== null) kerfInches = kerfValue;
   
@@ -109,15 +201,10 @@ function run() {
   const groutValue = parseNumericFlag(args, '--grout-spacing-inches', (v) => v >= 0, 'grout spacing');
   if (groutValue !== null) groutSpacingInches = groutValue;
   
+  // Warn about any remaining unparsed arguments
   if (args.length > 0) {
-    if (isNaN(parseFloat(args[0]))) {
-      shapeArg = args[0].toLowerCase();
-      if (args[1]) targetWidth = parseFloat(args[1]);
-      if (args[2]) targetHeight = parseFloat(args[2]);
-    } else {
-      targetWidth = parseFloat(args[0]);
-      if (args[1]) targetHeight = parseFloat(args[1]);
-    }
+    console.warn(`Warning: Unrecognized arguments: ${args.join(' ')}`);
+    console.warn('Use --help to see available options.');
   }
 
   // Convert inches to units (96 DPI standard for SVG)
