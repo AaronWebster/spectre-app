@@ -71,6 +71,9 @@ function parseNumericFlag(args, flagName, validationFn, errorMessage) {
         console.error(`Error: Invalid ${errorMessage} value "${args[flagIndex + 1]}". ${errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1)} must meet validation criteria.`);
         process.exit(1);
       }
+    } else {
+      console.error(`Error: ${flagName} flag requires a value.`);
+      process.exit(1);
     }
   }
   return null;
@@ -84,6 +87,9 @@ function parseStringFlag(args, flagName) {
       const value = args[flagIndex + 1];
       args.splice(flagIndex, 2); // Remove flag and value
       return value;
+    } else {
+      console.error(`Error: ${flagName} flag requires a value.`);
+      process.exit(1);
     }
   }
   return null;
