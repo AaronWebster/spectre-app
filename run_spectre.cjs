@@ -57,9 +57,18 @@ function run() {
   let shapeArg = "tile11";
   let targetWidth = 100;
   let targetHeight = 100;
+  let useTileSizeInches = false;
 
   // Argument Parsing
   const args = process.argv.slice(2);
+  
+  // Check for --tile-size-inches flag
+  const tileSizeInchesIndex = args.indexOf('--tile-size-inches');
+  if (tileSizeInchesIndex !== -1) {
+    useTileSizeInches = true;
+    args.splice(tileSizeInchesIndex, 1); // Remove the flag
+  }
+  
   if (args.length > 0) {
     if (isNaN(parseFloat(args[0]))) {
       shapeArg = args[0].toLowerCase();
@@ -71,8 +80,15 @@ function run() {
     }
   }
 
+  // Convert inches to units (96 DPI standard for SVG)
+  if (useTileSizeInches) {
+    const DPI = 96;
+    targetWidth = targetWidth * DPI;
+    targetHeight = targetHeight * DPI;
+  }
+
   console.log(
-    `Configuration: Shape=${shapeArg}, Size=${targetWidth}x${targetHeight}`,
+    `Configuration: Shape=${shapeArg}, Size=${targetWidth}x${targetHeight}${useTileSizeInches ? ' (from inches)' : ''}`,
   );
 
   console.log("Initializing Spectre Base...");

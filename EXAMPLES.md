@@ -24,6 +24,35 @@ node run_spectre.cjs 200 200
 ```
 Generates a large square tiling.
 
+## Dimensions in Inches
+
+### Using Inches for Print-Ready Output
+```bash
+node run_spectre.cjs --tile-size-inches 8.5 11
+```
+Generates a tiling for US Letter size (8.5 x 11 inches). The `--tile-size-inches` flag converts dimensions using 96 DPI (standard for SVG).
+
+### Common Print Sizes
+```bash
+# A4 size (approximately 8.3 x 11.7 inches)
+node run_spectre.cjs --tile-size-inches 8.3 11.7
+
+# Square poster (12 x 12 inches)
+node run_spectre.cjs --tile-size-inches 12 12
+
+# Business card (3.5 x 2 inches)
+node run_spectre.cjs --tile-size-inches 3.5 2
+```
+
+### Combining Inches with Tile Types
+```bash
+# 6x6 inch hexagonal tiling
+node run_spectre.cjs --tile-size-inches hexagons 6 6
+
+# 10x8 inch curved Spectre tiling
+node run_spectre.cjs --tile-size-inches spectres 10 8
+```
+
 ## Tile Type Examples
 
 ### Tile(1,1) - Default Spectre
