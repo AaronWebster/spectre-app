@@ -2,17 +2,18 @@ const globals = require('globals');
 const js = require('@eslint/js');
 
 module.exports = [
-  js.configs.recommended,
   {
+    ignores: ['*.test.js', 'node_modules/**', 'coverage/**']
+  },
+  {
+    ...js.configs.recommended,
     files: ['*.cjs', '*.js'],
-    ignores: ['*.test.js', 'node_modules/', 'coverage/'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'script',
       globals: {
         ...globals.node,
         ...globals.es6,
-        ...globals.jest,
         sys: 'writable',
         ident: 'readonly',
         colmap: 'writable',

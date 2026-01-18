@@ -1,8 +1,0 @@
-# Test files (intentionally use eval and mocks)
-*.test.js
-
-# Dependencies
-node_modules/
-
-# Coverage
-coverage/
