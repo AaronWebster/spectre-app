@@ -78,7 +78,7 @@ function run() {
       if (!isNaN(parsedValue) && parsedValue >= 0) {
         groutSpacingInches = parsedValue;
       } else {
-        console.error(`Error: Invalid grout spacing value "${args[groutSpacingIndex + 1]}". Must be a non-negative number.`);
+        console.error(`Error: Invalid grout spacing value "${args[groutSpacingIndex + 1]}". Must be a non-negative number (0 or greater).`);
         process.exit(1);
       }
       args.splice(groutSpacingIndex, 2); // Remove flag and value

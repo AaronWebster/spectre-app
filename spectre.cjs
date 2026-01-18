@@ -147,8 +147,7 @@ function erodePoints( pts, erosionDistance )
 			const factor = (dist - erosionDistance) / dist;
 			erodedPts.push(pt(cx + dx * factor, cy + dy * factor));
 		} else {
-			// Warning: If erosion distance >= distance to centroid, the point collapses to centroid.
-			// This can create degenerate shapes if erosion distance is too large relative to tile size.
+			// Point collapses to centroid when erosion >= distance to centroid, potentially creating degenerate shapes
 			erodedPts.push(pt(cx, cy));
 		}
 	}
