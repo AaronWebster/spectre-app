@@ -126,7 +126,9 @@ offset = -((spacing / 2) + (kerf / 2))
 This ensures:
 - Each tile is offset inward by half the spacing (shared gap between neighbors)
 - Plus half the kerf (so the cutting stream edge hits the desired line)
-- Uses centroid-based erosion which works well for the symmetric Spectre tile shapes
+- **Uses proper polygon buffering** with Clipper library for true parallel curve generation
+- Applies **round joins** to match the physical behavior of circular cutting tools (waterjet/laser)
+- Handles self-intersections and topology changes robustly, including concave shapes
 
 ```bash
 # Combine with other flags
@@ -136,7 +138,13 @@ node run_spectre.cjs --tile-size-inches --kerf 0.01 --spacing 0.03 8 6
 node run_spectre.cjs hexagons --tile-size-inches --kerf 0.01 --spacing 0.02 10 10
 ```
 
-**Technical Note:** The implementation uses centroid-based erosion, moving each vertex toward the tile's center by the calculated offset distance. For the relatively symmetric Spectre tile geometries, this provides good approximations for spacing. For complex concave shapes requiring true equidistant offsetting, dedicated CAM software is recommended.
+**Technical Note:** The implementation uses the **Clipper library** for proper polygon buffering (parallel curve generation), which provides:
+- **Constant gap width** everywhere (not variable at different angles like centroid-based methods)
+- **Preserves concave shapes** correctly (no distortion of non-convex geometries)
+- **Round joins** that match the physical behavior of circular cutting tools
+- **Robust handling** of self-intersections and topology changes
+
+This ensures precision and geometric correctness for CNC/CAM toolpath generation.
 
 ### Tile Scaling
 

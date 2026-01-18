@@ -118,9 +118,11 @@ function pframe( o, p, q, a, b )
 	return { x : o.x + a*p.x + b*q.x, y : o.y + a*p.y + b*q.y };
 }
 
-// Erode points towards their centroid by a given distance
-// This creates spacing (like grout) between tiles
-function erodePoints( pts, erosionDistance )
+// DEPRECATED: Legacy centroid-based erosion (FORBIDDEN TECHNIQUE)
+// This function is kept for reference only and should not be used.
+// The centroid-based approach creates variable gap widths at different angles
+// and distorts concave shapes, making it unsuitable for CNC/CAM toolpaths.
+function erodePoints_DEPRECATED( pts, erosionDistance )
 {
 	if (erosionDistance <= 0 || pts.length === 0) {
 		return pts;
@@ -155,6 +157,12 @@ function erodePoints( pts, erosionDistance )
 	return erodedPts;
 }
 
+// Backwards compatibility wrapper for tests that use erodePoints
+// NEW CODE SHOULD USE offsetPolygon() instead
+function erodePoints(pts, erosionDistance) {
+	return erodePoints_DEPRECATED(pts, erosionDistance);
+}
+
 // Scale points uniformly from their centroid
 function scalePointsFromCentroid(pts, scale)
 {
@@ -178,19 +186,98 @@ function scalePointsFromCentroid(pts, scale)
 	));
 }
 
-// Polygon offsetting for waterjet toolpath generation
-// For small uniform offsets on convex or near-convex shapes, centroid-based erosion
-// provides a reasonable approximation. For complex concave shapes, a full polygon
-// offsetting library would be needed, but this approach works well for the Spectre tiles.
+// Proper polygon offsetting using Clipper library
+// This implements true parallel curve generation with proper handling
+// of self-intersections, topology changes, and configurable join styles for CNC/waterjet toolpaths.
+//
+// For waterjet or laser cutting, the offset distance is strictly derived from:
+// offset = -0.5 * (spacing + kerf)
+// where negative indicates inward offset (erosion) for external contours.
+//
+// Key advantages over centroid-based erosion:
+// 1. Constant gap width everywhere (not variable at different angles)
+// 2. Preserves concave shapes correctly
+// 3. Handles self-intersections and topology changes robustly
+// 4. Uses round joins to match physical circular cutter behavior
 function offsetPolygon(pts, offsetDistance)
 {
 	if (offsetDistance === 0 || pts.length === 0) {
 		return pts;
 	}
 	
-	// Use centroid-based erosion which provides good results for the
-	// relatively simple, symmetric shapes in Spectre tilings
-	return erodePoints(pts, Math.abs(offsetDistance));
+	// Check if ClipperLib is available (loaded via require in Node.js or globally injected)
+	const clipper = typeof ClipperLib !== 'undefined' ? ClipperLib : null;
+	
+	if (!clipper) {
+		// Fallback for environments where Clipper is not available
+		// This should not be used for production CNC/CAM toolpaths
+		console.warn('Clipper library not available; using deprecated centroid-based erosion');
+		return erodePoints_DEPRECATED(pts, Math.abs(offsetDistance));
+	}
+	
+	try {
+		// Clipper works with integer coordinates for precision
+		// We scale up by a large factor, do the operation, then scale back down
+		const SCALE_FACTOR = 100000;
+		
+		// Convert points to Clipper format (scaled integers)
+		const scaledPath = pts.map(p => ({
+			X: Math.round(p.x * SCALE_FACTOR),
+			Y: Math.round(p.y * SCALE_FACTOR)
+		}));
+		
+		// Create ClipperOffset object
+		// miterLimit: 2.0 (standard value for miter joins, not used with round joins)
+		// arcTolerance: 0.25 (controls smoothness of round joins - smaller = smoother)
+		const co = new clipper.ClipperOffset(2.0, 0.25);
+		
+		// Add path with join type and end type
+		// JoinType: jtRound (1) for round joins (best for CNC/waterjet)
+		// EndType: etClosedPolygon (1) for closed polygons
+		co.AddPath(
+			scaledPath, 
+			clipper.JoinType.jtRound,  // Round joins for smooth curves
+			clipper.EndType.etClosedPolygon  // Closed polygon
+		);
+		
+		// Execute offset
+		// The offset delta needs to be scaled by the same factor
+		const scaledDelta = offsetDistance * SCALE_FACTOR;
+		const solution = [];
+		co.Execute(solution, scaledDelta);
+		
+		// Check if offsetting resulted in empty geometry (offset too large)
+		if (solution.length === 0) {
+			// Polygon vanished completely
+			return [];
+		}
+		
+		// If multiple polygons result, take the largest one
+		let largestPath = solution[0];
+		if (solution.length > 1) {
+			let largestArea = clipper.Clipper.Area(solution[0]);
+			for (let i = 1; i < solution.length; i++) {
+				const area = clipper.Clipper.Area(solution[i]);
+				if (Math.abs(area) > Math.abs(largestArea)) {
+					largestArea = area;
+					largestPath = solution[i];
+				}
+			}
+		}
+		
+		// Convert back to our point format (scale down)
+		const resultPts = largestPath.map(p => pt(
+			p.X / SCALE_FACTOR,
+			p.Y / SCALE_FACTOR
+		));
+		
+		return resultPts;
+		
+	} catch (error) {
+		console.error('Error in polygon offsetting:', error.message);
+		console.warn('Falling back to deprecated centroid-based erosion');
+		return erodePoints_DEPRECATED(pts, Math.abs(offsetDistance));
+	}
 }
 
 
