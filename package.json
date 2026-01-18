@@ -28,5 +28,9 @@
   "devDependencies": {
     "eslint": "^8.57.0",
     "jest": "^30.2.0"
+  },
+  "dependencies": {
+    "@flatten-js/core": "^1.6.10",
+    "@flatten-js/polygon-offset": "^1.1.4"
   }
 }

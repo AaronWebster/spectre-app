@@ -155,6 +155,53 @@ function erodePoints( pts, erosionDistance )
 	return erodedPts;
 }
 
+// Polygon offsetting using flatten-js library (for waterjet toolpath generation)
+// This applies proper equidistant offset to polygon boundaries
+function offsetPolygon(pts, offsetDistance)
+{
+	if (offsetDistance === 0 || pts.length === 0) {
+		return pts;
+	}
+	
+	// Check if flatten-js is available (it won't be in browser environment)
+	if (typeof require === 'undefined') {
+		// Fallback to centroid erosion in browser
+		return erodePoints(pts, Math.abs(offsetDistance));
+	}
+	
+	try {
+		const { Polygon: FlattenPolygon, point: flattenPoint } = require("@flatten-js/core");
+		const flattenOffset = require("@flatten-js/polygon-offset");
+		
+		// Create a flatten-js polygon from our points
+		const polygon = new FlattenPolygon();
+		const flattenPts = pts.map(p => flattenPoint(p.x, p.y));
+		polygon.addFace(flattenPts);
+		
+		// Apply the offset operation
+		const offsetPoly = flattenOffset(polygon, offsetDistance);
+		
+		// Convert back to our point format
+		// Get the first face (should be the only one for simple polygons)
+		const faces = [...offsetPoly.faces];
+		if (faces.length === 0) {
+			// Offset failed, return original points
+			return pts;
+		}
+		
+		const face = faces[0];
+		const resultPts = [];
+		for (let edge of face) {
+			resultPts.push(pt(edge.start.x, edge.start.y));
+		}
+		
+		return resultPts;
+	} catch (error) {
+		// If offsetting fails (e.g., library not available), fall back to centroid erosion
+		return erodePoints(pts, Math.abs(offsetDistance));
+	}
+}
+
 
 // Rotation matrix
 function trot( ang )
@@ -239,16 +286,35 @@ class Shape
 		drawPolygon( this.pts, S, colmap[this.label], [0,0,0], 0.1 );
 	}
 
-	streamSVG( S, stream, groutSpacing )
+	streamSVG( S, stream, offsetDistance, tileScale )
 	{
-		groutSpacing = groutSpacing || 0; // Default to 0 if not provided
+		offsetDistance = offsetDistance || 0; // Default to 0 if not provided
+		tileScale = tileScale || 1.0; // Default to 1.0 if not provided
 		
 		// Transform points to world coordinates
 		let worldPts = this.pts.map((p) => transPt(S, p));
 		
-		// Apply erosion if grout spacing is specified
-		if (groutSpacing > 0) {
-			worldPts = erodePoints(worldPts, groutSpacing / 2);
+		// Apply tile scaling first if specified
+		if (tileScale !== 1.0) {
+			// Calculate centroid
+			let cx = 0, cy = 0;
+			for (let p of worldPts) {
+				cx += p.x;
+				cy += p.y;
+			}
+			cx /= worldPts.length;
+			cy /= worldPts.length;
+			
+			// Scale from centroid
+			worldPts = worldPts.map(p => pt(
+				cx + (p.x - cx) * tileScale,
+				cy + (p.y - cy) * tileScale
+			));
+		}
+		
+		// Apply polygon offsetting if specified
+		if (offsetDistance !== 0) {
+			worldPts = offsetPolygon(worldPts, offsetDistance);
 		}
 		
 		var s = '<polygon points="';
@@ -314,17 +380,36 @@ class CurvyShape
 		endShape( CLOSE );
 	}
 
-	streamSVG( S, stream, groutSpacing )
+	streamSVG( S, stream, offsetDistance, tileScale )
 	{
-		groutSpacing = groutSpacing || 0; // Default to 0 if not provided
+		offsetDistance = offsetDistance || 0; // Default to 0 if not provided
+		tileScale = tileScale || 1.0; // Default to 1.0 if not provided
 		
 		// Transform all points to world coordinates first
 		let worldPts = this.pts.map((p) => transPt(S, p));
 		
-		// Apply erosion if grout spacing is specified
-		// For curved shapes, we erode the corner points (every 3rd point: 0, 3, 6, ...)
+		// Apply tile scaling first if specified
+		if (tileScale !== 1.0) {
+			// Calculate centroid
+			let cx = 0, cy = 0;
+			for (let p of worldPts) {
+				cx += p.x;
+				cy += p.y;
+			}
+			cx /= worldPts.length;
+			cy /= worldPts.length;
+			
+			// Scale from centroid
+			worldPts = worldPts.map(p => pt(
+				cx + (p.x - cx) * tileScale,
+				cy + (p.y - cy) * tileScale
+			));
+		}
+		
+		// Apply offsetting if specified
+		// For curved shapes, we offset the corner points (every 3rd point: 0, 3, 6, ...)
 		// and adjust control points proportionally
-		if (groutSpacing > 0) {
+		if (offsetDistance !== 0) {
 			// Extract corner points (indices 0, 3, 6, 9, ...)
 			const cornerPointIndices = [];
 			const cornerPoints = [];
@@ -333,14 +418,14 @@ class CurvyShape
 				cornerPoints.push(worldPts[i]);
 			}
 			
-			// Erode the corner points
-			const erodedCorners = erodePoints(cornerPoints, groutSpacing / 2);
+			// Offset the corner points using polygon offsetting
+			const offsetCorners = offsetPolygon(cornerPoints, offsetDistance);
 			
-			// Update worldPts with eroded corners and adjust control points
+			// Update worldPts with offset corners and adjust control points
 			for (let i = 0; i < cornerPointIndices.length; i++) {
 				const idx = cornerPointIndices[i];
 				const oldCorner = worldPts[idx];
-				const newCorner = erodedCorners[i];
+				const newCorner = offsetCorners[i];
 				const dx = newCorner.x - oldCorner.x;
 				const dy = newCorner.y - oldCorner.y;
 				
@@ -396,10 +481,10 @@ class Meta
 		}
 	}
 
-	streamSVG( S, stream, groutSpacing )
+	streamSVG( S, stream, offsetDistance, tileScale )
 	{
 		for( let g of this.geoms ) {
-			g.geom.streamSVG( mul( S, g.xform ), stream, groutSpacing );
+			g.geom.streamSVG( mul( S, g.xform ), stream, offsetDistance, tileScale );
 		}
 	}
 }
