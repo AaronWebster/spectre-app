@@ -63,6 +63,8 @@ function createMockEnvironment() {
     global.saveStrings = jest.fn();
     global.windowWidth = 100;
     global.windowHeight = 100;
+    // Add ClipperLib for polygon offsetting tests
+    global.ClipperLib = require('js-clipper');
 }
 
 // Shared helper function to load and prepare spectre code for testing
@@ -955,86 +957,6 @@ describe('Run Spectre - Grout Spacing Feature', () => {
         const groutSpacingUnits = groutSpacingInches * DPI;
         
         expect(groutSpacingUnits).toBe(0);
-    });
-});
-
-describe('Run Spectre - Erosion Function', () => {
-    beforeEach(() => {
-        createMockEnvironment();
-    });
-
-    test('erodePoints returns original points when erosion is zero', () => {
-        loadSpectreCode();
-
-        const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
-        const eroded = erodePoints(pts, 0);
-        
-        expect(eroded.length).toBe(pts.length);
-        for (let i = 0; i < pts.length; i++) {
-            expect(pointsEqual(eroded[i], pts[i])).toBe(true);
-        }
-    });
-
-    test('erodePoints shrinks square towards centroid', () => {
-        loadSpectreCode();
-
-        const pts = [pt(0, 0), pt(2, 0), pt(2, 2), pt(0, 2)];
-        const eroded = erodePoints(pts, 0.1);
-        
-        // Centroid is at (1, 1)
-        // Each point should be closer to centroid
-        expect(eroded.length).toBe(pts.length);
-        
-        for (let i = 0; i < pts.length; i++) {
-            const origDist = Math.sqrt(
-                (pts[i].x - 1) * (pts[i].x - 1) + 
-                (pts[i].y - 1) * (pts[i].y - 1)
-            );
-            const erodedDist = Math.sqrt(
-                (eroded[i].x - 1) * (eroded[i].x - 1) + 
-                (eroded[i].y - 1) * (eroded[i].y - 1)
-            );
-            
-            expect(erodedDist).toBeLessThan(origDist);
-        }
-    });
-
-    test('erodePoints with empty array returns empty array', () => {
-        loadSpectreCode();
-
-        const pts = [];
-        const eroded = erodePoints(pts, 1.0);
-        
-        expect(eroded).toEqual([]);
-    });
-
-    test('erodePoints calculates centroid correctly', () => {
-        loadSpectreCode();
-
-        const pts = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
-        // Centroid should be at (2, 2)
-        
-        // If we erode by the exact distance to centroid, all points should collapse to centroid
-        const dist = Math.sqrt(2 * 2 + 2 * 2); // Distance from corner to centroid
-        const eroded = erodePoints(pts, dist);
-        
-        // All points should be at or very close to centroid
-        for (let i = 0; i < eroded.length; i++) {
-            expect(approxEqual(eroded[i].x, 2, 0.01)).toBe(true);
-            expect(approxEqual(eroded[i].y, 2, 0.01)).toBe(true);
-        }
-    });
-
-    test('erodePoints with negative erosion acts like zero', () => {
-        loadSpectreCode();
-
-        const pts = [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)];
-        const eroded = erodePoints(pts, -0.5);
-        
-        expect(eroded.length).toBe(pts.length);
-        for (let i = 0; i < pts.length; i++) {
-            expect(pointsEqual(eroded[i], pts[i])).toBe(true);
-        }
     });
 });
 

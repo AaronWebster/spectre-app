@@ -26,10 +26,14 @@
     "node": ">=16.0.0"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
+    "eslint": "^9.39.2",
     "jest": "^30.2.0"
   },
   "dependencies": {
     "js-clipper": "^1.0.1"
+  },
+  "overrides": {
+    "glob": "^10.0.0",
+    "test-exclude": "^7.0.0"
   }
 }
