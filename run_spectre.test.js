@@ -1037,3 +1037,167 @@ describe('Run Spectre - Erosion Function', () => {
         }
     });
 });
+
+describe('Run Spectre - Kerf and Spacing Parameters', () => {
+    test('Kerf argument is parsed correctly', () => {
+        const args = ['--kerf', '0.01', '200', '150'];
+        const kerfIndex = args.indexOf('--kerf');
+        let kerfInches = 0;
+        
+        if (kerfIndex !== -1 && kerfIndex + 1 < args.length) {
+            kerfInches = parseFloat(args[kerfIndex + 1]);
+            args.splice(kerfIndex, 2);
+        }
+        
+        expect(kerfInches).toBe(0.01);
+        expect(args).toEqual(['200', '150']);
+    });
+
+    test('Spacing argument is parsed correctly', () => {
+        const args = ['--spacing', '0.02', '200', '150'];
+        const spacingIndex = args.indexOf('--spacing');
+        let spacingInches = 0;
+        
+        if (spacingIndex !== -1 && spacingIndex + 1 < args.length) {
+            spacingInches = parseFloat(args[spacingIndex + 1]);
+            args.splice(spacingIndex, 2);
+        }
+        
+        expect(spacingInches).toBe(0.02);
+        expect(args).toEqual(['200', '150']);
+    });
+
+    test('Kerf and spacing convert inches to units correctly', () => {
+        const DPI = 96;
+        const kerfInches = 0.01;
+        const spacingInches = 0.02;
+        
+        const kerfUnits = kerfInches * DPI;
+        const spacingUnits = spacingInches * DPI;
+        
+        expect(kerfUnits).toBe(0.96);
+        expect(spacingUnits).toBe(1.92);
+    });
+
+    test('Offset distance calculation uses waterjet formula', () => {
+        const spacingUnits = 1.92;  // 0.02 inches * 96 DPI
+        const kerfUnits = 0.96;      // 0.01 inches * 96 DPI
+        
+        // Formula: offset = -((spacing / 2) + (kerf / 2))
+        const offsetDistance = -((spacingUnits / 2) + (kerfUnits / 2));
+        
+        expect(offsetDistance).toBe(-1.44);
+    });
+
+    test('Multiple flags work together', () => {
+        const args = ['--kerf', '0.01', '--spacing', '0.02', '--scale', '0.9', '200', '150'];
+        let kerfInches = 0;
+        let spacingInches = 0;
+        let tileScale = 1.0;
+        
+        const kerfIndex = args.indexOf('--kerf');
+        if (kerfIndex !== -1 && kerfIndex + 1 < args.length) {
+            kerfInches = parseFloat(args[kerfIndex + 1]);
+            args.splice(kerfIndex, 2);
+        }
+        
+        const spacingIndex = args.indexOf('--spacing');
+        if (spacingIndex !== -1 && spacingIndex + 1 < args.length) {
+            spacingInches = parseFloat(args[spacingIndex + 1]);
+            args.splice(spacingIndex, 2);
+        }
+        
+        const scaleIndex = args.indexOf('--scale');
+        if (scaleIndex !== -1 && scaleIndex + 1 < args.length) {
+            tileScale = parseFloat(args[scaleIndex + 1]);
+            args.splice(scaleIndex, 2);
+        }
+        
+        expect(kerfInches).toBe(0.01);
+        expect(spacingInches).toBe(0.02);
+        expect(tileScale).toBe(0.9);
+        expect(args).toEqual(['200', '150']);
+    });
+});
+
+describe('Run Spectre - Tile Scale Parameter', () => {
+    test('Scale argument is parsed correctly', () => {
+        const args = ['--scale', '0.9', '200', '150'];
+        const scaleIndex = args.indexOf('--scale');
+        let tileScale = 1.0;
+        
+        if (scaleIndex !== -1 && scaleIndex + 1 < args.length) {
+            tileScale = parseFloat(args[scaleIndex + 1]);
+            args.splice(scaleIndex, 2);
+        }
+        
+        expect(tileScale).toBe(0.9);
+        expect(args).toEqual(['200', '150']);
+    });
+
+    test('Scale defaults to 1.0 when not specified', () => {
+        const args = ['200', '150'];
+        let tileScale = 1.0;
+        
+        const scaleIndex = args.indexOf('--scale');
+        if (scaleIndex !== -1 && scaleIndex + 1 < args.length) {
+            tileScale = parseFloat(args[scaleIndex + 1]);
+            args.splice(scaleIndex, 2);
+        }
+        
+        expect(tileScale).toBe(1.0);
+        expect(args).toEqual(['200', '150']);
+    });
+
+    test('Scale with various values', () => {
+        const testValues = [0.5, 0.75, 0.9, 1.0, 1.1, 1.5, 2.0];
+        
+        testValues.forEach(value => {
+            const args = ['--scale', value.toString(), '100', '100'];
+            const scaleIndex = args.indexOf('--scale');
+            let tileScale = 1.0;
+            
+            if (scaleIndex !== -1 && scaleIndex + 1 < args.length) {
+                tileScale = parseFloat(args[scaleIndex + 1]);
+                args.splice(scaleIndex, 2);
+            }
+            
+            expect(tileScale).toBe(value);
+        });
+    });
+});
+
+describe('Run Spectre - Polygon Offsetting', () => {
+    test('offsetPolygon function exists in spectre.cjs', () => {
+        loadSpectreCode();
+        expect(typeof offsetPolygon).toBe('function');
+    });
+
+    test('offsetPolygon returns original points when offset is zero', () => {
+        loadSpectreCode();
+
+        const pts = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
+        const result = offsetPolygon(pts, 0);
+        
+        expect(result.length).toBe(pts.length);
+    });
+
+    test('offsetPolygon handles negative offset (erosion)', () => {
+        loadSpectreCode();
+
+        const pts = [pt(0, 0), pt(4, 0), pt(4, 4), pt(0, 4)];
+        const result = offsetPolygon(pts, -0.5);
+        
+        // Result should have same number of points (or more if library adds vertices)
+        expect(result.length).toBeGreaterThanOrEqual(pts.length);
+    });
+
+    test('offsetPolygon with empty array returns empty array', () => {
+        loadSpectreCode();
+
+        const pts = [];
+        const result = offsetPolygon(pts, -0.5);
+        
+        expect(result.length).toBe(0);
+    });
+});

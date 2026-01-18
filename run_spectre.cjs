@@ -53,12 +53,33 @@ eval(spectreCode);
 
 // -- Automation Logic --
 
+// Helper function to parse numeric flag arguments
+function parseNumericFlag(args, flagName, validationFn, errorMessage) {
+  const flagIndex = args.indexOf(flagName);
+  if (flagIndex !== -1) {
+    if (flagIndex + 1 < args.length) {
+      const parsedValue = parseFloat(args[flagIndex + 1]);
+      if (!isNaN(parsedValue) && validationFn(parsedValue)) {
+        args.splice(flagIndex, 2); // Remove flag and value
+        return parsedValue;
+      } else {
+        console.error(`Error: Invalid ${errorMessage} value "${args[flagIndex + 1]}". ${errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1)} must meet validation criteria.`);
+        process.exit(1);
+      }
+    }
+  }
+  return null;
+}
+
 function run() {
   let shapeArg = "tile11";
   let targetWidth = 100;
   let targetHeight = 100;
   let useTileSizeInches = false;
   let groutSpacingInches = 0;
+  let kerfInches = 0;
+  let spacingInches = 0;
+  let tileScale = 1.0;
 
   // Argument Parsing
   const args = process.argv.slice(2);
@@ -70,20 +91,18 @@ function run() {
     args.splice(tileSizeInchesIndex, 1); // Remove the flag
   }
   
-  // Check for --grout-spacing-inches flag
-  const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
-  if (groutSpacingIndex !== -1) {
-    if (groutSpacingIndex + 1 < args.length) {
-      const parsedValue = parseFloat(args[groutSpacingIndex + 1]);
-      if (!isNaN(parsedValue) && parsedValue >= 0) {
-        groutSpacingInches = parsedValue;
-      } else {
-        console.error(`Error: Invalid grout spacing value "${args[groutSpacingIndex + 1]}". Must be a non-negative number (0 or greater).`);
-        process.exit(1);
-      }
-      args.splice(groutSpacingIndex, 2); // Remove flag and value
-    }
-  }
+  // Parse numeric flags
+  const kerfValue = parseNumericFlag(args, '--kerf', (v) => v >= 0, 'kerf');
+  if (kerfValue !== null) kerfInches = kerfValue;
+  
+  const spacingValue = parseNumericFlag(args, '--spacing', (v) => v >= 0, 'spacing');
+  if (spacingValue !== null) spacingInches = spacingValue;
+  
+  const scaleValue = parseNumericFlag(args, '--scale', (v) => v > 0, 'scale');
+  if (scaleValue !== null) tileScale = scaleValue;
+  
+  const groutValue = parseNumericFlag(args, '--grout-spacing-inches', (v) => v >= 0, 'grout spacing');
+  if (groutValue !== null) groutSpacingInches = groutValue;
   
   if (args.length > 0) {
     if (isNaN(parseFloat(args[0]))) {
@@ -103,11 +122,26 @@ function run() {
     targetHeight = targetHeight * DPI;
   }
   
-  // Convert grout spacing from inches to units
+  // Convert parameters from inches to units
   const groutSpacingUnits = groutSpacingInches * DPI;
+  const kerfUnits = kerfInches * DPI;
+  const spacingUnits = spacingInches * DPI;
+  
+  // Calculate the polygon offset distance using the waterjet formula
+  // offset = -((spacing / 2) + (kerf / 2))
+  // Negative because we're eroding (shrinking) the polygons
+  let offsetDistance = 0;
+  
+  // Priority: Use kerf and spacing if specified, otherwise fall back to grout spacing
+  if (kerfInches > 0 || spacingInches > 0) {
+    offsetDistance = -((spacingUnits / 2) + (kerfUnits / 2));
+  } else if (groutSpacingInches > 0) {
+    // Backward compatibility: grout spacing acts like spacing
+    offsetDistance = -(groutSpacingUnits / 2);
+  }
 
   console.log(
-    `Configuration: Shape=${shapeArg}, Size=${targetWidth}x${targetHeight}${useTileSizeInches ? ' (from inches)' : ''}${groutSpacingInches > 0 ? `, Grout=${groutSpacingInches} inches` : ''}`,
+    `Configuration: Shape=${shapeArg}, Size=${targetWidth}x${targetHeight}${useTileSizeInches ? ' (from inches)' : ''}${kerfInches > 0 || spacingInches > 0 || groutSpacingInches > 0 ? `, Kerf=${kerfInches} inches, Spacing=${spacingInches > 0 ? spacingInches : groutSpacingInches} inches` : ''}${tileScale !== 1.0 ? `, Scale=${tileScale}` : ''}`,
   );
 
   console.log("Initializing Spectre Base...");
@@ -310,7 +344,7 @@ function run() {
   svgContent.push(svgHeader);
 
   for (let item of keptShapes) {
-    item.shape.streamSVG(item.T, svgContent, groutSpacingUnits);
+    item.shape.streamSVG(item.T, svgContent, offsetDistance, tileScale);
   }
 
   svgContent.push(svgFooter);
