@@ -10,6 +10,7 @@ This project provides a command-line tool to generate SVG images of Spectre tili
 
 - **Multiple Tile Types**: Generate tilings using Spectre, Hat/Turtle, or Hexagon tiles
 - **Configurable Output**: Specify custom dimensions for generated tilings
+- **Grout Spacing**: Add adjustable spacing between tiles to simulate physical tile installations
 - **SVG Export**: High-quality vector graphics output suitable for printing or further editing
 - **Automatic Centering**: Crops to a centered region with proper boundary handling
 - **Hierarchical Generation**: Uses supertile substitution to efficiently generate large tilings
@@ -73,6 +74,29 @@ The `--tile-size-inches` flag can be combined with tile type selection:
 node run_spectre.cjs --tile-size-inches hexagons 5 5
 # 5x5 inch hexagonal tiling
 ```
+
+### Adding Grout Spacing
+
+Add spacing between tiles (like grout in a tile floor) by specifying the spacing in inches:
+
+```bash
+node run_spectre.cjs --grout-spacing-inches 0.01 200 150
+# 200x150 units with 0.01 inch spacing between tiles
+```
+
+The grout spacing parameter erodes each tile from its centroid, creating a gap between adjacent tiles without disturbing the lattice structure. This is useful for simulating physical tile installations where grout or spacing is needed.
+
+The `--grout-spacing-inches` flag can be combined with other flags:
+
+```bash
+# 8x6 inch tiling with 0.02 inch grout spacing
+node run_spectre.cjs --tile-size-inches --grout-spacing-inches 0.02 8 6
+
+# Hexagonal tiling with grout spacing
+node run_spectre.cjs hexagons --grout-spacing-inches 0.015 200 200
+```
+
+**Note:** The grout spacing value should be appropriate for the tile size. Very large spacing values relative to tile size may cause tiles to collapse to points.
 
 ### Selecting Tile Types
 
