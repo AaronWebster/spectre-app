@@ -227,7 +227,9 @@ function offsetPolygon(pts, offsetDistance)
 		}));
 		
 		// Create ClipperOffset object
-		const co = new clipper.ClipperOffset();
+		// miterLimit: 2.0 (standard value for miter joins, not used with round joins)
+		// arcTolerance: 0.25 (controls smoothness of round joins - smaller = smoother)
+		const co = new clipper.ClipperOffset(2.0, 0.25);
 		
 		// Add path with join type and end type
 		// JoinType: jtRound (1) for round joins (best for CNC/waterjet)
@@ -241,11 +243,7 @@ function offsetPolygon(pts, offsetDistance)
 		// Execute offset
 		// The offset delta needs to be scaled by the same factor
 		const scaledDelta = offsetDistance * SCALE_FACTOR;
-		const solution = new clipper.Paths();
-		
-		// ArcTolerance controls the smoothness of round joins
-		// Smaller values = smoother (more segments). Default is 0.25 scaled units.
-		co.ArcTolerance = 0.25;
+		const solution = [];
 		co.Execute(solution, scaledDelta);
 		
 		// Check if offsetting resulted in empty geometry (offset too large)
