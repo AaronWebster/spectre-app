@@ -155,6 +155,29 @@ function erodePoints( pts, erosionDistance )
 	return erodedPts;
 }
 
+// Scale points uniformly from their centroid
+function scalePointsFromCentroid(pts, scale)
+{
+	if (scale === 1.0 || pts.length === 0) {
+		return pts;
+	}
+	
+	// Calculate centroid
+	let cx = 0, cy = 0;
+	for (let p of pts) {
+		cx += p.x;
+		cy += p.y;
+	}
+	cx /= pts.length;
+	cy /= pts.length;
+	
+	// Scale from centroid
+	return pts.map(p => pt(
+		cx + (p.x - cx) * scale,
+		cy + (p.y - cy) * scale
+	));
+}
+
 // Polygon offsetting for waterjet toolpath generation
 // For small uniform offsets on convex or near-convex shapes, centroid-based erosion
 // provides a reasonable approximation. For complex concave shapes, a full polygon
@@ -264,20 +287,7 @@ class Shape
 		
 		// Apply tile scaling first if specified
 		if (tileScale !== 1.0) {
-			// Calculate centroid
-			let cx = 0, cy = 0;
-			for (let p of worldPts) {
-				cx += p.x;
-				cy += p.y;
-			}
-			cx /= worldPts.length;
-			cy /= worldPts.length;
-			
-			// Scale from centroid
-			worldPts = worldPts.map(p => pt(
-				cx + (p.x - cx) * tileScale,
-				cy + (p.y - cy) * tileScale
-			));
+			worldPts = scalePointsFromCentroid(worldPts, tileScale);
 		}
 		
 		// Apply polygon offsetting if specified
@@ -358,20 +368,7 @@ class CurvyShape
 		
 		// Apply tile scaling first if specified
 		if (tileScale !== 1.0) {
-			// Calculate centroid
-			let cx = 0, cy = 0;
-			for (let p of worldPts) {
-				cx += p.x;
-				cy += p.y;
-			}
-			cx /= worldPts.length;
-			cy /= worldPts.length;
-			
-			// Scale from centroid
-			worldPts = worldPts.map(p => pt(
-				cx + (p.x - cx) * tileScale,
-				cy + (p.y - cy) * tileScale
-			));
+			worldPts = scalePointsFromCentroid(worldPts, tileScale);
 		}
 		
 		// Apply offsetting if specified

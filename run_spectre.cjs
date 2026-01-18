@@ -53,6 +53,24 @@ eval(spectreCode);
 
 // -- Automation Logic --
 
+// Helper function to parse numeric flag arguments
+function parseNumericFlag(args, flagName, validationFn, errorMessage) {
+  const flagIndex = args.indexOf(flagName);
+  if (flagIndex !== -1) {
+    if (flagIndex + 1 < args.length) {
+      const parsedValue = parseFloat(args[flagIndex + 1]);
+      if (!isNaN(parsedValue) && validationFn(parsedValue)) {
+        args.splice(flagIndex, 2); // Remove flag and value
+        return parsedValue;
+      } else {
+        console.error(`Error: Invalid ${errorMessage} value "${args[flagIndex + 1]}". ${errorMessage.charAt(0).toUpperCase() + errorMessage.slice(1)} must meet validation criteria.`);
+        process.exit(1);
+      }
+    }
+  }
+  return null;
+}
+
 function run() {
   let shapeArg = "tile11";
   let targetWidth = 100;
@@ -73,65 +91,18 @@ function run() {
     args.splice(tileSizeInchesIndex, 1); // Remove the flag
   }
   
-  // Check for --kerf flag
-  const kerfIndex = args.indexOf('--kerf');
-  if (kerfIndex !== -1) {
-    if (kerfIndex + 1 < args.length) {
-      const parsedValue = parseFloat(args[kerfIndex + 1]);
-      if (!isNaN(parsedValue) && parsedValue >= 0) {
-        kerfInches = parsedValue;
-      } else {
-        console.error(`Error: Invalid kerf value "${args[kerfIndex + 1]}". Must be a non-negative number (0 or greater).`);
-        process.exit(1);
-      }
-      args.splice(kerfIndex, 2); // Remove flag and value
-    }
-  }
+  // Parse numeric flags
+  const kerfValue = parseNumericFlag(args, '--kerf', (v) => v >= 0, 'kerf');
+  if (kerfValue !== null) kerfInches = kerfValue;
   
-  // Check for --spacing flag
-  const spacingIndex = args.indexOf('--spacing');
-  if (spacingIndex !== -1) {
-    if (spacingIndex + 1 < args.length) {
-      const parsedValue = parseFloat(args[spacingIndex + 1]);
-      if (!isNaN(parsedValue) && parsedValue >= 0) {
-        spacingInches = parsedValue;
-      } else {
-        console.error(`Error: Invalid spacing value "${args[spacingIndex + 1]}". Must be a non-negative number (0 or greater).`);
-        process.exit(1);
-      }
-      args.splice(spacingIndex, 2); // Remove flag and value
-    }
-  }
+  const spacingValue = parseNumericFlag(args, '--spacing', (v) => v >= 0, 'spacing');
+  if (spacingValue !== null) spacingInches = spacingValue;
   
-  // Check for --scale flag
-  const scaleIndex = args.indexOf('--scale');
-  if (scaleIndex !== -1) {
-    if (scaleIndex + 1 < args.length) {
-      const parsedValue = parseFloat(args[scaleIndex + 1]);
-      if (!isNaN(parsedValue) && parsedValue > 0) {
-        tileScale = parsedValue;
-      } else {
-        console.error(`Error: Invalid scale value "${args[scaleIndex + 1]}". Must be a positive number (greater than 0).`);
-        process.exit(1);
-      }
-      args.splice(scaleIndex, 2); // Remove flag and value
-    }
-  }
+  const scaleValue = parseNumericFlag(args, '--scale', (v) => v > 0, 'scale');
+  if (scaleValue !== null) tileScale = scaleValue;
   
-  // Check for --grout-spacing-inches flag (backward compatibility)
-  const groutSpacingIndex = args.indexOf('--grout-spacing-inches');
-  if (groutSpacingIndex !== -1) {
-    if (groutSpacingIndex + 1 < args.length) {
-      const parsedValue = parseFloat(args[groutSpacingIndex + 1]);
-      if (!isNaN(parsedValue) && parsedValue >= 0) {
-        groutSpacingInches = parsedValue;
-      } else {
-        console.error(`Error: Invalid grout spacing value "${args[groutSpacingIndex + 1]}". Must be a non-negative number (0 or greater).`);
-        process.exit(1);
-      }
-      args.splice(groutSpacingIndex, 2); // Remove flag and value
-    }
-  }
+  const groutValue = parseNumericFlag(args, '--grout-spacing-inches', (v) => v >= 0, 'grout spacing');
+  if (groutValue !== null) groutSpacingInches = groutValue;
   
   if (args.length > 0) {
     if (isNaN(parseFloat(args[0]))) {
