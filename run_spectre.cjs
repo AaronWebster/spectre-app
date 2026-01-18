@@ -1,6 +1,4 @@
 const fs = require("fs");
-const offset = require("@flatten-js/polygon-offset");
-const { Polygon, point } = require("@flatten-js/core");
 
 // Mocks and Polyfills for p5.js environment
 const cos = Math.cos;

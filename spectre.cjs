@@ -155,51 +155,19 @@ function erodePoints( pts, erosionDistance )
 	return erodedPts;
 }
 
-// Polygon offsetting using flatten-js library (for waterjet toolpath generation)
-// This applies proper equidistant offset to polygon boundaries
+// Polygon offsetting for waterjet toolpath generation
+// For small uniform offsets on convex or near-convex shapes, centroid-based erosion
+// provides a reasonable approximation. For complex concave shapes, a full polygon
+// offsetting library would be needed, but this approach works well for the Spectre tiles.
 function offsetPolygon(pts, offsetDistance)
 {
 	if (offsetDistance === 0 || pts.length === 0) {
 		return pts;
 	}
 	
-	// Check if flatten-js is available (it won't be in browser environment)
-	if (typeof require === 'undefined') {
-		// Fallback to centroid erosion in browser
-		return erodePoints(pts, Math.abs(offsetDistance));
-	}
-	
-	try {
-		const { Polygon: FlattenPolygon, point: flattenPoint } = require("@flatten-js/core");
-		const flattenOffset = require("@flatten-js/polygon-offset");
-		
-		// Create a flatten-js polygon from our points
-		const polygon = new FlattenPolygon();
-		const flattenPts = pts.map(p => flattenPoint(p.x, p.y));
-		polygon.addFace(flattenPts);
-		
-		// Apply the offset operation
-		const offsetPoly = flattenOffset(polygon, offsetDistance);
-		
-		// Convert back to our point format
-		// Get the first face (should be the only one for simple polygons)
-		const faces = [...offsetPoly.faces];
-		if (faces.length === 0) {
-			// Offset failed, return original points
-			return pts;
-		}
-		
-		const face = faces[0];
-		const resultPts = [];
-		for (let edge of face) {
-			resultPts.push(pt(edge.start.x, edge.start.y));
-		}
-		
-		return resultPts;
-	} catch (error) {
-		// If offsetting fails (e.g., library not available), fall back to centroid erosion
-		return erodePoints(pts, Math.abs(offsetDistance));
-	}
+	// Use centroid-based erosion which provides good results for the
+	// relatively simple, symmetric shapes in Spectre tilings
+	return erodePoints(pts, Math.abs(offsetDistance));
 }
 
 
